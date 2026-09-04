@@ -8,7 +8,7 @@
 // START: API Client Functions
 // ======================================================
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || '/api';
 // ======================================================
 // Function : request
 // Purpose  : Implements logic for 'request'
