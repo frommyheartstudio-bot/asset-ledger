@@ -138,6 +138,13 @@ export function LifecycleEvents() {
             </select>
             <div className="hint">Same scenarios as the reference calculator — fills every field below.</div>
           </div>
+          <Input
+            label="Asset Number"
+            value={assetNumber}
+            placeholder="e.g. 845862189"
+            hint="Required — the transaction is linked to this asset."
+            onChange={(e) => setAssetNumber(e.target.value)}
+          />
           <div className="form-grid">
             {schema.map((field) => {
                 if (field.type === 'select') {
@@ -153,9 +160,10 @@ export function LifecycleEvents() {
             })}
           </div>
           <div className="flex gap-2 mt-2">
-            <Button variant="primary" onClick={calculatePreview} disabled={loading}>
+            <Button variant="primary" onClick={calculatePreview} disabled={loading || !assetNumber.trim()}>
               {loading ? 'Calculating…' : 'Calculate Preview'}
             </Button>
+            {!assetNumber.trim() && <span className="hint" style={{ marginLeft: 8 }}>Enter an Asset Number first</span>}
           </div>
         </div>
 
