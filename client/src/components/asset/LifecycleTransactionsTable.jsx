@@ -17,6 +17,7 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pill } from '../ui/ui';
+import { Pagination, usePagination } from '../ui/Pagination';
 import { EmptyState } from '../common/EmptyState';
 import { formatDateTime } from '../../utils/formatDate';
 
@@ -32,12 +33,14 @@ import { formatDateTime } from '../../utils/formatDate';
 
 export function LifecycleTransactionsTable({ items, showAssetColumn = false, emptyTitle = 'No transactions posted yet', emptyDescription = 'Events posted from the Lifecycle page will show up here, pulled from the Postgres ledger.' }) {
     const [expandedId, setExpandedId] = useState(null);
+    const pg = usePagination(items ?? []);
 
     if (!items || items.length === 0) {
         return <EmptyState title={emptyTitle} description={emptyDescription}/>;
     }
 
-    return (<div className="table-responsive table-wrap">
+    return (<>
+    <div className="table-responsive table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -50,7 +53,7 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
           </tr>
         </thead>
         <tbody>
-          {items.map((tx) => {
+          {pg.pageItems.map((tx) => {
             const isOpen = expandedId === tx.transactionId;
             return (<Fragment key={tx.transactionId}>
                 <tr onClick={() => setExpandedId(isOpen ? null : tx.transactionId)} style={{ cursor: 'pointer' }}>
@@ -111,7 +114,9 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
           })}
         </tbody>
       </table>
-    </div>);
+    </div>
+    <Pagination {...pg.pager}/>
+    </>);
 }
 
 // ======================================================
@@ -120,4 +125,8 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
 
 // ======================================================
 // END: Component Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : LifecycleTransactionsTable.jsx
 // ======================================================

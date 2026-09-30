@@ -24,7 +24,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
  */
 // ======================================================
 // Function : validateInput
-// Purpose  : Implements logic for 'validateInput'
+// Purpose  : Step 1: checks the required Disposal inputs (cost > 0, dates, cost disposed) and returns the errors.
 // ======================================================
 
 function validateInput(input) {
@@ -82,7 +82,7 @@ function validateInput(input) {
  */
 // ======================================================
 // Function : determineDisposalType
-// Purpose  : Implements logic for 'determineDisposalType'
+// Purpose  : Step 2: returns "full" when the whole cost is disposed, otherwise "partial".
 // ======================================================
 
 function determineDisposalType(input) {
@@ -165,7 +165,7 @@ function calculatePartialDisposal(input) {
  */
 // ======================================================
 // Function : determineTiming
-// Purpose  : Implements logic for 'determineTiming'
+// Purpose  : Step 3: decides whether the Disposal is current-period or backdated (same-year / prior-year).
 // ======================================================
 
 function determineTiming(input) {
@@ -1023,7 +1023,7 @@ var TestCaseManager = (function () {
  */
 // ======================================================
 // Function : buildFlowchartDefinition
-// Purpose  : Implements logic for 'buildFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildFlowchartDefinition(activePath, result) {
@@ -1257,7 +1257,7 @@ function buildFlowchartDefinition(activePath, result) {
  */
 // ======================================================
 // Function : validatePostProcessing
-// Purpose  : Implements logic for 'validatePostProcessing'
+// Purpose  : Runs the post-processing checks on the disposal result within a tolerance of 0.01.
 // ======================================================
 
 function validatePostProcessing(input, result) {
@@ -1354,7 +1354,7 @@ function validatePostProcessing(input, result) {
  */
 // ======================================================
 // Function : compareValues
-// Purpose  : Implements logic for 'compareValues'
+// Purpose  : Compares a calculated value with an expected one and reports match, difference and tolerance.
 // ======================================================
 
 function compareValues(calculated, expected, tolerance) {
@@ -1380,3 +1380,6 @@ module.exports = { calculateDisposal: calculate };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : disposals.cjs
+// ======================================================

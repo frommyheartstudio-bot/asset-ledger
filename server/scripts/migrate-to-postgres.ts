@@ -23,6 +23,10 @@ import { flush } from '../src/db/repo.js';
 import { ensureSchedules } from '../src/services/schedule-builder.js';
 import type { Asset, DepreciationScheduleRow, TimelineEntry } from '../src/types.js';
 
+// ======================================================
+// START: Script Functions
+// ======================================================
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE_PATH = path.join(__dirname, '..', 'data-store.json');
 
@@ -31,6 +35,11 @@ type StoreShape = {
   timelines: Record<string, TimelineEntry[]>;
   depreciationSchedules: Record<string, DepreciationScheduleRow[]>;
 };
+
+// ======================================================
+// Function : main
+// Purpose  : One-time migration: loads the data-store snapshot into Postgres after checking the connection.
+// ======================================================
 
 async function main(): Promise<void> {
   if (!(await pingPostgres())) {
@@ -83,3 +92,11 @@ main().catch((err) => {
   console.error('Migration failed:', err);
   process.exit(1);
 });
+
+// ======================================================
+// END: Script Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : migrate-to-postgres.ts
+// ======================================================

@@ -47,10 +47,10 @@ const reclassificationsEngine = require(join(ENGINE_DIR, 'reclassifications.cjs'
 // ── Shared helpers ──────────────────────────────────────────────────────
 // ======================================================
 // Function : round2
-// Purpose  : Implements logic for 'round2'
+// Purpose  : Rounds a number to 2 decimal places (with EPSILON so 1.005 rounds up).
 // ======================================================
 
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
@@ -60,7 +60,7 @@ function round2(n: number): number {
 
 // ======================================================
 // Function : num
-// Purpose  : Implements logic for 'num'
+// Purpose  : Reads a form field as a number; strips commas from strings and falls back to the default.
 // ======================================================
 
 function num(fields: Record<string, unknown>, key: string, fallback = 0): number {
@@ -76,7 +76,7 @@ function num(fields: Record<string, unknown>, key: string, fallback = 0): number
 
 // ======================================================
 // Function : str
-// Purpose  : Implements logic for 'str'
+// Purpose  : Reads a form field as a non-empty string, otherwise the fallback.
 // ======================================================
 
 function str(fields: Record<string, unknown>, key: string, fallback = ''): string {
@@ -90,7 +90,7 @@ function str(fields: Record<string, unknown>, key: string, fallback = ''): strin
 
 // ======================================================
 // Function : bool
-// Purpose  : Implements logic for 'bool'
+// Purpose  : Reads a form field as a boolean (true or "true").
 // ======================================================
 
 function bool(fields: Record<string, unknown>, key: string): boolean {
@@ -103,7 +103,7 @@ function bool(fields: Record<string, unknown>, key: string): boolean {
 
 // ======================================================
 // Function : money
-// Purpose  : Implements logic for 'money'
+// Purpose  : Formats a number as a signed US dollar string with 2 decimals.
 // ======================================================
 
 function money(n: number): string {
@@ -118,7 +118,7 @@ function money(n: number): string {
 /** 'Q2 (Apr–Jun)' / 'Q2' / 2 -> 2 */
 // ======================================================
 // Function : parseQuarter
-// Purpose  : Implements logic for 'parseQuarter'
+// Purpose  : Extracts the quarter number (1-4) from a value like "Q1 (Jan-Mar)"; defaults to 1.
 // ======================================================
 
 function parseQuarter(raw: unknown): number {
@@ -137,7 +137,7 @@ function parseQuarter(raw: unknown): number {
  *  than 'Mid-Month' for the mid-month convention. */
 // ======================================================
 // Function : normConvention
-// Purpose  : Implements logic for 'normConvention'
+// Purpose  : Normalises a convention label to HY / MQ / Mid-Month (long or short style).
 // ======================================================
 
 function normConvention(raw: string, style: 'long' | 'short' = 'long'): string {
@@ -201,7 +201,7 @@ const ASSET_METHOD_BY_CODE: Record<string, string> = {
 
 // ======================================================
 // Function : assetCode
-// Purpose  : Implements logic for 'assetCode'
+// Purpose  : Converts an asset type label from the form into its asset class code.
 // ======================================================
 
 function assetCode(f: Record<string, unknown>, key = 'assetType'): string {
@@ -215,7 +215,7 @@ function assetCode(f: Record<string, unknown>, key = 'assetType'): string {
 
 // ======================================================
 // Function : methodForCode
-// Purpose  : Implements logic for 'methodForCode'
+// Purpose  : Returns the depreciation method for an asset class code (defaults to MACRS).
 // ======================================================
 
 function methodForCode(code: string): string {
@@ -230,7 +230,7 @@ function methodForCode(code: string): string {
  *  empty (mirrors the reference calculators skipping empty step cards). */
 // ======================================================
 // Function : section
-// Purpose  : Implements logic for 'section'
+// Purpose  : Builds one preview section (title + label/value rows), dropping empty rows.
 // ======================================================
 
 function section(title: string, rows: Array<[string, string] | null | false>): LifecyclePreviewSection {
@@ -243,7 +243,7 @@ function section(title: string, rows: Array<[string, string] | null | false>): L
 
 // ======================================================
 // Function : pct
-// Purpose  : Implements logic for 'pct'
+// Purpose  : Formats a number as a percentage string.
 // ======================================================
 
 function pct(n: number): string {
@@ -259,7 +259,7 @@ function pct(n: number): string {
  *  field-level message instead of a partial/garbage calculation. */
 // ======================================================
 // Function : errorResult
-// Purpose  : Implements logic for 'errorResult'
+// Purpose  : Converts an engine validation failure into a "Needs Attention" preview result.
 // ======================================================
 
 function errorResult(engineResult: any): LifecyclePreviewResult {
@@ -479,7 +479,7 @@ function calcAdjustment(f: Record<string, unknown>): LifecyclePreviewResult {
 // Ported from Htmls/pages/adjustments.html displayStepResults().
 // ======================================================
 // Function : adjustmentSections
-// Purpose  : Implements logic for 'adjustmentSections'
+// Purpose  : Builds the preview sections for an Adjustment from the engine steps.
 // ======================================================
 
 function adjustmentSections(s: any): LifecyclePreviewSection[] {
@@ -601,7 +601,7 @@ function calcRetirement(f: Record<string, unknown>): LifecyclePreviewResult {
 // Ported from Htmls/pages/disposals.html displayStepResults().
 // ======================================================
 // Function : retirementSections
-// Purpose  : Implements logic for 'retirementSections'
+// Purpose  : Builds the preview sections for a Retirement (disposal) from the engine steps.
 // ======================================================
 
 function retirementSections(s: any): LifecyclePreviewSection[] {
@@ -749,7 +749,7 @@ function calcTransfer(f: Record<string, unknown>): LifecyclePreviewResult {
 // Ported from Htmls/pages/transfers.html displayResults().
 // ======================================================
 // Function : transferSections
-// Purpose  : Implements logic for 'transferSections'
+// Purpose  : Builds the preview sections for a Transfer from the engine steps.
 // ======================================================
 
 function transferSections(s: any): LifecyclePreviewSection[] {
@@ -871,7 +871,7 @@ function calcReinstatement(f: Record<string, unknown>): LifecyclePreviewResult {
 // Ported from Htmls/pages/reinstatements.html displayResults().
 // ======================================================
 // Function : reinstatementSections
-// Purpose  : Implements logic for 'reinstatementSections'
+// Purpose  : Builds the preview sections for a Reinstatement from the engine steps.
 // ======================================================
 
 function reinstatementSections(s: any): LifecyclePreviewSection[] {
@@ -990,7 +990,7 @@ function calcReclassification(f: Record<string, unknown>): LifecyclePreviewResul
 // Reclassification event's own step objects.
 // ======================================================
 // Function : reclassificationSections
-// Purpose  : Implements logic for 'reclassificationSections'
+// Purpose  : Builds the preview sections for a Reclassification from the engine steps.
 // ======================================================
 
 function reclassificationSections(s: any): LifecyclePreviewSection[] {
@@ -1134,3 +1134,6 @@ export function calculateScenarioProjection(basis: number, scenario: ScenarioInp
 // END: Service Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : depreciation.ts
+// ======================================================

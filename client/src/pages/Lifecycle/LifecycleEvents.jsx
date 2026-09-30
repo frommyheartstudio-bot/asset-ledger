@@ -25,6 +25,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { useAssets } from '../../hooks/useAssets';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { useAuth } from '../../hooks/useAuth';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { FIELD_SCHEMAS, FIELD_DEFAULTS, reinstatementFieldsFromAsset } from '../../data/lifecycleFormSchemas';
@@ -372,6 +373,7 @@ function MasterDataSetSection({
     items, total, loading, error, reload, assetSet, toggleAsset, toggleAllVisible, clearSet, assetSetList,
     mode, setMode, oneAsset, setOneAsset
 }) {
+    const pg = usePagination(items);
     return (<>
       <div className="card card-pad mb-4">
         <div className="flex items-center justify-between mb-2">
@@ -437,7 +439,7 @@ function MasterDataSetSection({
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((a) => (<tr key={a.assetNumber} onClick={() => toggleAsset(a)} style={{ cursor: 'pointer' }}>
+                        {pg.pageItems.map((a) => (<tr key={a.assetNumber} onClick={() => toggleAsset(a)} style={{ cursor: 'pointer' }}>
                             <td><input type="checkbox" checked={assetSet.has(a.assetNumber)} onChange={() => toggleAsset(a)} onClick={(e) => e.stopPropagation()}/></td>
                             <td className="mono">{a.assetNumber}</td>
                             <td>{a.description}</td>
@@ -449,6 +451,7 @@ function MasterDataSetSection({
                       </tbody>
                     </table>
                   </div>)}
+                {!loading && items.length > 0 && <Pagination {...pg.pager}/>}
               </>)}
           </div>
 
@@ -647,6 +650,7 @@ function OneAssetPanel({
     canPost, assetClass, setAssetClass, company, setCompany, status, setStatus, q, setQ,
     items, total, loading, error, reload, selectedAsset, setSelectedAsset
 }) {
+    const pg = usePagination(items);
     const assetNumber = selectedAsset?.assetNumber ?? '';
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState([]); // parsed CSV rows (raw, header-keyed), blank rows dropped
@@ -773,7 +777,7 @@ function OneAssetPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((a) => (<tr key={a.assetNumber} onClick={() => selectAsset(a)} style={{ cursor: 'pointer' }}>
+                      {pg.pageItems.map((a) => (<tr key={a.assetNumber} onClick={() => selectAsset(a)} style={{ cursor: 'pointer' }}>
                           <td className="mono">{a.assetNumber}</td>
                           <td>{a.description}</td>
                           <td>{a.assetClass}</td>
@@ -784,6 +788,7 @@ function OneAssetPanel({
                     </tbody>
                   </table>
                 </div>)}
+              {!loading && items.length > 0 && <Pagination {...pg.pager}/>}
             </>)}
         </div>)}
 
@@ -843,4 +848,8 @@ function OneAssetPanel({
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : LifecycleEvents.jsx
 // ======================================================

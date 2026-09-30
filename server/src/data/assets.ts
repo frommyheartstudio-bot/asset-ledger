@@ -279,6 +279,11 @@ export const timelines: Record<string, TimelineEntry[]> = {};
 
 registerSnapshotSource(() => ({ assets, timelines, depreciationSchedules }));
 
+// ======================================================
+// Function : replaceContents
+// Purpose  : Replaces the in-memory assets, timelines and schedules with the contents of a loaded snapshot.
+// ======================================================
+
 function replaceContents(snapshot: StoreShape): void {
   assets.length = 0;
   assets.push(...snapshot.assets);
@@ -305,6 +310,11 @@ function replaceContents(snapshot: StoreShape): void {
 //            Returns the asset numbers it filled in, for the boot log.
 // ======================================================
 
+// ======================================================
+// Function : conventionLabel
+// Purpose  : Maps a method description to its convention label (Mid-Month, Mid-Quarter or Half-Year).
+// ======================================================
+
 function conventionLabel(method: string): string {
   const m = method.toLowerCase();
   if (m.includes('mid-month') || m.includes('mid month')) return 'Mid-Month';
@@ -312,9 +322,19 @@ function conventionLabel(method: string): string {
   return 'Half-Year';
 }
 
+// ======================================================
+// Function : propertyTypeFor
+// Purpose  : Returns Real Property for 39 / 27.5 year lives, otherwise Personal Property.
+// ======================================================
+
 function propertyTypeFor(life: number): string {
   return life === 39 || life === 27.5 ? 'Real Property' : 'Personal Property';
 }
+
+// ======================================================
+// Function : ensureTaxFactPatterns
+// Purpose  : Fills in the tax fact pattern (in-service date, recovery period, method, convention, rate) for assets that lack one; returns the asset numbers it filled.
+// ======================================================
 
 export function ensureTaxFactPatterns(
   assetList: Asset[],
@@ -407,7 +427,7 @@ export async function initStore(): Promise<{ source: string; assetCount: number;
 
 // ======================================================
 // Function : findAsset
-// Purpose  : Implements logic for 'findAsset'
+// Purpose  : Finds an asset in the in-memory register by asset number.
 // ======================================================
 
 export function findAsset(assetNumber: string): Asset | undefined {
@@ -581,6 +601,11 @@ function inferAssetClass(fields: Record<string, string | number | boolean>): str
 // END: inferAssetClass
 // ======================================================
 
+// ======================================================
+// Function : applyLifecycleEvent
+// Purpose  : Applies a posted lifecycle event (addition, adjustment, transfer, etc.) to the in-memory asset and its timeline.
+// ======================================================
+
 export function applyLifecycleEvent(
   eventType: LifecycleEventType,
   assetNumber: string,
@@ -705,3 +730,6 @@ export function applyLifecycleEvent(
 // END: Data Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : assets.ts
+// ======================================================

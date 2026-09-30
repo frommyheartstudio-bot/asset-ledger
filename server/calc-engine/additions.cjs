@@ -20,7 +20,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
 // ── Step 1: Validate Inputs ──────────────────────────────────
 // ======================================================
 // Function : validateAdditionInput
-// Purpose  : Implements logic for 'validateAdditionInput'
+// Purpose  : Step 1: checks the required Addition inputs and returns the list of errors.
 // ======================================================
 
 function validateAdditionInput(input) {
@@ -57,7 +57,7 @@ function validateAdditionInput(input) {
 // ── Step 2: Determine Addition Timing ────────────────────────
 // ======================================================
 // Function : determineAdditionTiming
-// Purpose  : Implements logic for 'determineAdditionTiming'
+// Purpose  : Step 2: decides whether the Addition is current-period or backdated from the in-service and accounting period dates.
 // ======================================================
 
 function determineAdditionTiming(input) {
@@ -90,7 +90,7 @@ function determineAdditionTiming(input) {
 // ── Step 3: Determine Property Type & Method ─────────────────
 // ======================================================
 // Function : determinePropertyType
-// Purpose  : Implements logic for 'determinePropertyType'
+// Purpose  : Step 3: resolves property type, method, convention and rate from the asset type and life.
 // ======================================================
 
 function determinePropertyType(input) {
@@ -524,7 +524,7 @@ function calculateYTDTotal(input, bonusResult, regularResult, revisionResult, ti
 // ── Step 7: Build DDV Output ─────────────────────────────────
 // ======================================================
 // Function : buildAdditionDDV
-// Purpose  : Implements logic for 'buildAdditionDDV'
+// Purpose  : Builds the Depreciation Detail View (cost, accumulated depreciation, NBV) for the Addition.
 // ======================================================
 
 function buildAdditionDDV(input, propertyInfo, bonusResult, regularResult, revisionResult, timingResult) {
@@ -565,7 +565,7 @@ function buildAdditionDDV(input, propertyInfo, bonusResult, regularResult, revis
 // ── Step 8: Post-Processing Validation ───────────────────────
 // ======================================================
 // Function : validateAdditionPostProcessing
-// Purpose  : Implements logic for 'validateAdditionPostProcessing'
+// Purpose  : Runs the post-processing checks (cost balance, NBV = cost - accum. depr.) on the DDV.
 // ======================================================
 
 function validateAdditionPostProcessing(input, ddv) {
@@ -691,7 +691,7 @@ function calculateAddition(input) {
 // ── Flowchart Definition Builder ─────────────────────────────
 // ======================================================
 // Function : buildAdditionFlowchartDefinition
-// Purpose  : Implements logic for 'buildAdditionFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildAdditionFlowchartDefinition(activePath, result) {
@@ -972,3 +972,6 @@ module.exports = { calculateAddition: calculateAddition };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : additions.cjs
+// ======================================================

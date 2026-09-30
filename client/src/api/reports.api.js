@@ -19,7 +19,7 @@ export const reportsApi = {
     // Planning (Modeling + Forecasting) calls live here too, since the target
     // structure only calls out one extra api file per domain group.
     getModelingScenarios: () => api.get('/modeling/scenarios'),
-    compareModelingScenarios: (basis, scenarios, baselineAssetNumbers = [], startYear = new Date().getFullYear(), bonusPctByYear = []) => api.post('/modeling/compare', { basis, scenarios, baselineAssetNumbers, startYear, bonusPctByYear }),
+    compareModelingScenarios: (basis, scenarios, baselineAssetNumbers = [], startYear = new Date().getFullYear(), bonusPctByYear = [], book) => api.post('/modeling/compare', { basis, scenarios, baselineAssetNumbers, startYear, bonusPctByYear, book }),
     getForecast: (years = 5, filters = {}) => {
         const params = new URLSearchParams({ years: String(years) });
         // Company / Asset Type are checkbox multi-selects — send whatever's
@@ -27,6 +27,7 @@ export const reportsApi = {
         // "All" and is left off the query entirely.
         if (filters.company?.length) params.set('company', filters.company.join(','));
         if (filters.assetType?.length) params.set('assetType', filters.assetType.join(','));
+        if (filters.book) params.set('book', filters.book);
         return api.get(`/forecasting?${params.toString()}`);
     }
 };
@@ -35,3 +36,6 @@ export const reportsApi = {
 // END: API Client Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : reports.api.js
+// ======================================================

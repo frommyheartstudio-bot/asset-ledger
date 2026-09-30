@@ -34,7 +34,7 @@ export function useAssets(filters) {
             .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load assets'))
             .finally(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters.assetClass, filters.company, filters.status, filters.method, filters.q, reloadToken]);
+    }, [filters.assetClass, filters.company, filters.status, filters.method, filters.q, filters.book, reloadToken]);
     return { items, total, loading, error, reload: () => setReloadToken((t) => t + 1) };
 }
 
@@ -46,3 +46,6 @@ export function useAssets(filters) {
 // END: Hook Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : useAssets.js
+// ======================================================

@@ -5,6 +5,10 @@
 
 import { FIELD_SCHEMAS } from '../data/lifecycleFormSchemas';
 
+// ======================================================
+// START: Utility Functions
+// ======================================================
+
 // Label <-> id map for the six Lifecycle Event types. The CSV's
 // "eventType" column holds the label (e.g. "Addition") — same string
 // /api/lifecycle/bulk-post expects — but coercing a row's field values
@@ -222,14 +226,6 @@ export function downloadCsv(filename, text) {
 }
 
 // ======================================================
-// Function : rowsToLifecycleRows
-// Purpose  : Converts parsed CSV rows into the { assetNumber, fields }
-//            shape the /lifecycle/bulk-import endpoint expects, coercing
-//            number/checkbox fields per the event's schema so the
-//            calculator gets the same types the manual form would send.
-// ======================================================
-
-// ======================================================
 // Function : coerceFieldValue
 // Purpose  : Shared coercion for one CSV cell against its field's
 //            schema definition — number/checkbox/select typing, same
@@ -267,6 +263,14 @@ export function coerceFieldValue(def, rawValue) {
     }
     return val;
 }
+
+// ======================================================
+// Function : rowsToLifecycleRows
+// Purpose  : Converts parsed CSV rows into the { assetNumber, fields }
+//            shape the /lifecycle/bulk-import endpoint expects, coercing
+//            number/checkbox fields per the event's schema so the
+//            calculator gets the same types the manual form would send.
+// ======================================================
 
 export function rowsToLifecycleRows(csvRows, schema) {
     const fieldByKey = Object.fromEntries(schema.map((f) => [f.key, f]));
@@ -376,4 +380,12 @@ export function findUnmatchedSelectValuesUnified(csvRows) {
 
 // ======================================================
 // END: csv.js
+// ======================================================
+
+// ======================================================
+// END: Utility Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : csv.js
 // ======================================================

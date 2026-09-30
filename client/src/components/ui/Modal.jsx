@@ -49,3 +49,6 @@ export function Modal({ open, title, onClose, children, footer }) {
 // END: Component Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : Modal.jsx
+// ======================================================

@@ -21,7 +21,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
 // ── Step 1: Validate Inputs ──────────────────────────────────
 // ======================================================
 // Function : validateReclassInput
-// Purpose  : Implements logic for 'validateReclassInput'
+// Purpose  : Step 1: checks the required Reclassification inputs (old/new asset type, dates, cost) and returns the errors.
 // ======================================================
 
 function validateReclassInput(input) {
@@ -62,7 +62,7 @@ function validateReclassInput(input) {
 // ── Step 2: Determine Reclassification Type ──────────────────
 // ======================================================
 // Function : determineReclassType
-// Purpose  : Implements logic for 'determineReclassType'
+// Purpose  : Step 2: compares old and new method / life / convention / bonus to classify the reclass.
 // ======================================================
 
 function determineReclassType(input) {
@@ -108,7 +108,7 @@ function determineReclassType(input) {
 // ── Step 3: Determine Reclassification Timing ────────────────
 // ======================================================
 // Function : determineReclassTiming
-// Purpose  : Implements logic for 'determineReclassTiming'
+// Purpose  : Step 3: decides whether the Reclassification is current-period or backdated.
 // ======================================================
 
 function determineReclassTiming(input) {
@@ -331,7 +331,7 @@ function calculateReclassRevision(input, reclassType, timingResult, oldParamsRes
 // ── Step 7: Build Reclassification DDV ───────────────────────
 // ======================================================
 // Function : buildReclassDDV
-// Purpose  : Implements logic for 'buildReclassDDV'
+// Purpose  : Builds the Depreciation Detail View using the new parameters going forward.
 // ======================================================
 
 function buildReclassDDV(input, reclassType, timingResult, oldParamsResult, newParamsResult, revisionResult) {
@@ -376,7 +376,7 @@ function buildReclassDDV(input, reclassType, timingResult, oldParamsResult, newP
 // ── Step 8: Validate Reclassification Post-Processing ────────
 // ======================================================
 // Function : validateReclassPostProcessing
-// Purpose  : Implements logic for 'validateReclassPostProcessing'
+// Purpose  : Runs the post-processing checks (cost unchanged, balances) within a tolerance of 0.02.
 // ======================================================
 
 function validateReclassPostProcessing(input, reclassType, ddv, revisionResult) {
@@ -500,7 +500,7 @@ function calculateReclassification(input) {
 // ── Flowchart Definition Builder ─────────────────────────────
 // ======================================================
 // Function : buildReclassFlowchartDefinition
-// Purpose  : Implements logic for 'buildReclassFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildReclassFlowchartDefinition(activePath, result) {
@@ -673,3 +673,6 @@ module.exports = { calculateReclassification: calculateReclassification };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : reclassifications.cjs
+// ======================================================

@@ -7,6 +7,22 @@
 
 import { api } from './client';
 
+// ======================================================
+// START: API Functions
+// ======================================================
+
 export const configApi = {
     getAssetClasses: () => api.get('/config/asset-classes'),
+    getCustomAssetClasses: () => api.get('/config/asset-classes/custom'),
+    updateCustomAssetClass: (id, body) => api.put(`/config/asset-classes/custom/${id}`, body),
+    createCustomAssetClass: (body) => api.post('/config/asset-classes/custom', body),
+    deleteCustomAssetClass: (id) => api.del(`/config/asset-classes/custom/${id}`),
 };
+
+// ======================================================
+// END: API Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : config.api.js
+// ======================================================

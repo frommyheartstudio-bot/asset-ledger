@@ -11,6 +11,10 @@ import { FIELD_SCHEMAS } from '../../../data/lifecycleFormSchemas';
 import { EventFormBase } from './EventFormBase';
 
 // ======================================================
+// START: Component Functions
+// ======================================================
+
+// ======================================================
 // Function : Reclassification
 // Purpose  : React component that renders the 'Reclassification' event
 //            form
@@ -25,4 +29,12 @@ export function Reclassification(props) {
 
 // ======================================================
 // END: Reclassification
+// ======================================================
+
+// ======================================================
+// END: Component Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : Reclassification.jsx
 // ======================================================

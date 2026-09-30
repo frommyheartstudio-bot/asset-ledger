@@ -3,9 +3,11 @@
 // Purpose   : In-memory data store / accessors for activity
 // ======================================================
 
-import type { Asset, LifecycleActivity } from '../types.js';
+import type { Asset, DepreciationScheduleRow, LifecycleActivity } from '../types.js';
 import { assets, depreciationSchedules } from './assets.js';
-import { ensureSchedules, inServiceDate, toISODate } from '../services/schedule-builder.js';
+import { ensureSchedules, inServiceDate, round2, toISODate } from '../services/schedule-builder.js';
+import { DEFAULT_BOOK } from './books.js';
+import { scheduleForBook, viewAssetForBook } from '../services/book-view.js';
 
 
 // ======================================================
@@ -46,12 +48,13 @@ const CLASS_LABELS: Record<string, string> = {
 };
 const FALLBACK_COLORS = ['#2563eb', '#0d9488', '#7c3aed', '#d97706', '#94a3b8', '#dc2626', '#059669', '#ca8a04', '#0891b2', '#be185d'];
 
+// ======================================================
+// Function : round1
+// Purpose  : Rounds a number to 1 decimal place.
+// ======================================================
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 // ======================================================
@@ -69,6 +72,11 @@ function compactMoney(n: number): string {
   if (abs >= 1e3) return `$${round1(n / 1e3)}K`;
   return `$${Math.round(n).toLocaleString('en-US')}`;
 }
+
+// ======================================================
+// Function : monthKey
+// Purpose  : Returns the YYYY-MM key for a date (used to bucket monthly depreciation).
+// ======================================================
 
 function monthKey(d: Date): string {
   return d.toISOString().slice(0, 7); // YYYY-MM
@@ -151,8 +159,15 @@ export function monthsInServiceDuringYear(
 //            schedule at all.
 // ======================================================
 
-function assetDepreciationForMonth(a: Asset, monthStart: string, monthEnd: string, monthYear: string): number {
-  const rows = depreciationSchedules[a.assetNumber] ?? [];
+function assetDepreciationForMonth(
+  a: Asset,
+  monthStart: string,
+  monthEnd: string,
+  monthYear: string,
+  // The schedule to read. Defaults to the stored (Federal Tax) one; the
+  // book-aware callers pass the schedule of the book being viewed.
+  rows: DepreciationScheduleRow[] = depreciationSchedules[a.assetNumber] ?? []
+): number {
 
   // In service by the END of this month? inServiceDate falls back
   // through the schedule and disposal date when the tax fact pattern
@@ -187,8 +202,16 @@ function assetDepreciationForMonth(a: Asset, monthStart: string, monthEnd: strin
 // END: assetDepreciationForMonth
 // ======================================================
 
-function computeMonthlyDepreciationForMonths(monthDates: Date[], grossCost: number) {
+// ======================================================
+// Function : computeMonthlyDepreciationForMonths
+// Purpose  : Builds the monthly depreciation series (value, asset count, projected flag) for the given months.
+// ======================================================
+
+function computeMonthlyDepreciationForMonths(monthDates: Date[], grossCost: number, book: string = DEFAULT_BOOK) {
   const today = new Date();
+  // Each asset as this book sees it (its own method/convention) plus that
+  // book's schedule — built once, not once per month.
+  const bookAssets = assets.map((a) => ({ view: viewAssetForBook(a, book), rows: scheduleForBook(a, book) }));
 
   const monthly: { month: string; value: number; assetCount: number; projected: boolean }[] = [];
   for (const monthDate of monthDates) {
@@ -203,8 +226,8 @@ function computeMonthlyDepreciationForMonths(monthDates: Date[], grossCost: numb
       (monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() > today.getMonth());
 
     let assetCount = 0;
-    const value = assets.reduce((sum, a) => {
-      const contribution = assetDepreciationForMonth(a, monthStart, monthEnd, monthYear);
+    const value = bookAssets.reduce((sum, { view, rows }) => {
+      const contribution = assetDepreciationForMonth(view, monthStart, monthEnd, monthYear, rows);
       if (contribution > 0) assetCount += 1;
       return sum + contribution;
     }, 0);
@@ -258,11 +281,11 @@ function computeMonthlyDepreciationForMonths(monthDates: Date[], grossCost: numb
 //            than an estimate invented just for this chart.
 // ======================================================
 
-export function computeMonthlyDepreciationForYear(year: number) {
+export function computeMonthlyDepreciationForYear(year: number, book: string = DEFAULT_BOOK) {
   ensureSchedules(assets, depreciationSchedules);
   const grossCost = assets.reduce((sum, a) => sum + a.cost, 0);
   const months = Array.from({ length: 12 }, (_, m) => new Date(year, m, 1));
-  return computeMonthlyDepreciationForMonths(months, grossCost);
+  return computeMonthlyDepreciationForMonths(months, grossCost, book);
 }
 
 // ======================================================
@@ -283,8 +306,10 @@ export function computeMonthlyDepreciationForYear(year: number) {
 //            Dashboard's FY dropdown and Forecasting.
 // ======================================================
 
-export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: number) {
+export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: number, book: string = DEFAULT_BOOK) {
   ensureSchedules([asset], depreciationSchedules);
+  const view = viewAssetForBook(asset, book);
+  const rows = scheduleForBook(asset, book);
   const today = new Date();
   const months = Array.from({ length: 12 }, (_, m) => new Date(year, m, 1));
 
@@ -297,7 +322,7 @@ export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: numbe
     const projected =
       monthDate.getFullYear() > today.getFullYear() ||
       (monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() > today.getMonth());
-    const value = round2(assetDepreciationForMonth(asset, monthStart, monthEnd, monthYear));
+    const value = round2(assetDepreciationForMonth(view, monthStart, monthEnd, monthYear, rows));
 
     return {
       month: monthDate.toLocaleString('en-US', { month: 'long' }),
@@ -323,7 +348,7 @@ export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: numbe
 //            sitting on fixed demo numbers.
 // ======================================================
 
-export function computeDashboardSummary() {
+export function computeDashboardSummary(book: string = DEFAULT_BOOK) {
   // A "Retired" asset has been disposed — it's no longer part of the
   // active book. Previously totalAssets/grossCost/netBookValue/assetsByClass
   // summed every asset unconditionally, including retired ones. That's how
@@ -334,7 +359,9 @@ export function computeDashboardSummary() {
   // disposal record was written correctly, so retired assets are excluded
   // from every aggregate below — the same convention the monthly
   // depreciation chart already uses for retired-before-the-period assets.
-  const activeBook = assets.filter((a) => a.status !== 'Retired');
+  // Every asset as the chosen book sees it — Federal Tax is the stored
+  // data untouched; other books apply their own rules (services/book-view.ts).
+  const activeBook = assets.map((a) => viewAssetForBook(a, book)).filter((a) => a.status !== 'Retired');
 
   const totalAssets = activeBook.length;
   const grossCost = activeBook.reduce((sum, a) => sum + a.cost, 0);
@@ -367,7 +394,7 @@ export function computeDashboardSummary() {
   const trailing6 = [5, 4, 3, 2, 1, 0].map(
     (i) => new Date(now.getFullYear(), now.getMonth() - i, 1)
   );
-  const monthlyDepreciationChart = computeMonthlyDepreciationForMonths(trailing6, grossCost);
+  const monthlyDepreciationChart = computeMonthlyDepreciationForMonths(trailing6, grossCost, book);
 
   // Assets by Class — grouped by NBV share, matching the "By NBV" label
   // already on the card. Grouped by each asset's actual IRS class code
@@ -389,6 +416,7 @@ export function computeDashboardSummary() {
     });
 
   return {
+    book,
     totalAssets,
     addedThisPeriod,
     grossCost,
@@ -417,7 +445,7 @@ export function computeDashboardSummary() {
 //            portfolio-wide, same as before this filter existed.
 // ======================================================
 
-export function computeForecast(yearCount = 5, filters: { company?: string[]; assetType?: string[] } = {}) {
+export function computeForecast(yearCount = 5, filters: { company?: string[]; assetType?: string[] } = {}, book: string = DEFAULT_BOOK) {
   const span = Math.min(10, Math.max(1, Math.round(yearCount) || 5));
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -429,8 +457,16 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
   const scopedAssets = assets.filter((a) => (!filters.company?.length || filters.company.includes(a.company)) &&
     (!filters.assetType?.length || filters.assetType.includes(a.assetClass)));
 
+  // Each asset's schedule and NBV as the chosen book sees them.
+  const bookRows = new Map<string, DepreciationScheduleRow[]>();
+  const bookNbv = new Map<string, number>();
+  for (const a of scopedAssets) {
+    bookRows.set(a.assetNumber, scheduleForBook(a, book));
+    bookNbv.set(a.assetNumber, viewAssetForBook(a, book).nbv);
+  }
+
   function scheduleRowForYear(assetNumber: string, year: number) {
-    const rows = depreciationSchedules[assetNumber] ?? [];
+    const rows = bookRows.get(assetNumber) ?? [];
     return rows.find((r) => r.year.startsWith(String(year)));
   }
 
@@ -461,8 +497,9 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
           // quick Add Asset form). There's no rate on file to project
           // forward with, so it honestly carries at its current NBV
           // rather than assuming a depreciation curve we don't have.
-          openingNbv += a.nbv;
-          closingNbv += a.nbv;
+          const nbv = bookNbv.get(a.assetNumber) ?? a.nbv;
+          openingNbv += nbv;
+          closingNbv += nbv;
         }
       }
 
@@ -486,7 +523,7 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
 
   const expenseByYear = rollForward.map((r) => ({ year: r.year, millions: round1(-r.depreciation / 1e6) }));
 
-  const currentNbv = scopedAssets.reduce((sum, a) => sum + a.nbv, 0);
+  const currentNbv = scopedAssets.reduce((sum, a) => sum + (bookNbv.get(a.assetNumber) ?? a.nbv), 0);
   const thisYearDepr = -rollForward[0].depreciation;
   const nextYearDepr = -rollForward[Math.min(1, rollForward.length - 1)].depreciation;
   const projectedDepreciationDeltaPct = thisYearDepr > 0 ? round1(((nextYearDepr - thisYearDepr) / thisYearDepr) * 100) : 0;
@@ -499,7 +536,7 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
 
   let assetsFullyDepreciatingNextFY = 0;
   for (const a of scopedAssets) {
-    const rows = depreciationSchedules[a.assetNumber] ?? [];
+    const rows = bookRows.get(a.assetNumber) ?? [];
     const zeroRow = rows.find((r) => r.closingNbv <= 1);
     if (zeroRow && zeroRow.year.startsWith(String(years[Math.min(1, years.length - 1)]))) assetsFullyDepreciatingNextFY += 1;
   }
@@ -508,6 +545,7 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
   const projectedEndingNbvDeltaPct = currentNbv > 0 ? round1(((projectedEndingNbv - currentNbv) / currentNbv) * 100) : 0;
 
   return {
+    book,
     kpis: {
       projectedDepreciationNextFY: nextYearDepr,
       projectedDepreciationDeltaPct,
@@ -526,3 +564,6 @@ export function computeForecast(yearCount = 5, filters: { company?: string[]; as
 // END: Data Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : activity.ts
+// ======================================================

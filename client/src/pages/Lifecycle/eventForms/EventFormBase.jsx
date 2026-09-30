@@ -23,6 +23,10 @@ import { EmptyState } from '../../../components/common/EmptyState';
 import { useAssetClassRows, useAssetClasses, lifeToMonths, conventionToOption } from '../../../hooks/useAssetClasses';
 
 // ======================================================
+// START: Component Functions
+// ======================================================
+
+// ======================================================
 // Function : EventFormBase
 // Purpose  : React component that renders the shared per-type form UI
 // ======================================================
@@ -176,4 +180,12 @@ export function EventFormBase({
 
 // ======================================================
 // END: EventFormBase
+// ======================================================
+
+// ======================================================
+// END: Component Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : EventFormBase.jsx
 // ======================================================

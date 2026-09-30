@@ -7,6 +7,8 @@ import { Router } from 'express';
 import { assets, depreciationSchedules, ensureTaxFactPatterns, findAsset, persist, timelines } from '../data/assets.js';
 import { computeAssetMonthlyDepreciationForYear } from '../data/activity.js';
 import { ensureSchedules } from '../services/schedule-builder.js';
+import { resolveBook } from '../data/books.js';
+import { primeBookRules, scheduleForBook, viewAssetForBook, viewAssetsForBook } from '../services/book-view.js';
 
 
 // ======================================================
@@ -23,10 +25,13 @@ export const assetsRouter = Router();
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-assetsRouter.get('/', (req, res) => {
+assetsRouter.get('/', async (req, res) => {
   const { assetClass, company, status, method, q } = req.query as Record<string, string | undefined>;
+  // ?book= picks which book's view of the assets to return (default Federal Tax).
+  const book = resolveBook(req.query.book);
+  await primeBookRules();
 
-  let results = assets;
+  let results = viewAssetsForBook(assets, book);
   if (assetClass && assetClass !== 'All Classes') results = results.filter((a) => a.assetClass === assetClass);
   if (company && company !== 'All Companies') results = results.filter((a) => a.company === company);
   if (status) results = results.filter((a) => a.status === status);
@@ -39,6 +44,7 @@ assetsRouter.get('/', (req, res) => {
   }
 
   res.json({
+    book,
     total: results.length,
     items: results
   });
@@ -84,7 +90,9 @@ assetsRouter.post('/', (req, res) => {
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-assetsRouter.get('/:assetNumber', (req, res) => {
+assetsRouter.get('/:assetNumber', async (req, res) => {
+  const book = resolveBook(req.query.book);
+  await primeBookRules();
   const asset = findAsset(req.params.assetNumber);
   if (!asset) {
     res.status(404).json({ error: 'Asset not found' });
@@ -101,9 +109,10 @@ assetsRouter.get('/:assetNumber', (req, res) => {
     if (filled.length > 0) persist();
   }
   res.json({
-    asset,
+    book,
+    asset: viewAssetForBook(asset, book),
     timeline: timelines[asset.assetNumber] ?? [],
-    depreciationSchedule: depreciationSchedules[asset.assetNumber] ?? []
+    depreciationSchedule: scheduleForBook(asset, book)
   });
 });
 
@@ -126,8 +135,10 @@ assetsRouter.get('/:assetNumber', (req, res) => {
 // Output   : res (HTTP response, JSON: { year, months })
 // ======================================================
 
-assetsRouter.get('/:assetNumber/monthly-depreciation', (req, res) => {
+assetsRouter.get('/:assetNumber/monthly-depreciation', async (req, res) => {
   try {
+    const book = resolveBook(req.query.book);
+    await primeBookRules();
     const asset = findAsset(req.params.assetNumber);
     if (!asset) {
       res.status(404).json({ error: 'Asset not found' });
@@ -136,7 +147,7 @@ assetsRouter.get('/:assetNumber/monthly-depreciation', (req, res) => {
     const currentYear = new Date().getFullYear();
     const parsed = Number(req.query.year);
     const year = Number.isInteger(parsed) && parsed > 1900 && parsed < 2200 ? parsed : currentYear;
-    res.json({ year, months: computeAssetMonthlyDepreciationForYear(asset, year) });
+    res.json({ book, year, months: computeAssetMonthlyDepreciationForYear(asset, year, book) });
   } catch (err) {
     console.error('[asset monthly-depreciation] failed:', err);
     res.status(500).json({ error: 'Failed to compute monthly depreciation' });
@@ -151,3 +162,6 @@ assetsRouter.get('/:assetNumber/monthly-depreciation', (req, res) => {
 // END: Route Handlers
 // ======================================================
 
+// ======================================================
+// END OF FILE : assets.ts
+// ======================================================

@@ -12,6 +12,7 @@ import { lifecycleApi } from '../../api/lifecycle.api';
 import { AppLayout } from '../../layout/AppLayout';
 import { Pill } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { FIELD_SCHEMAS } from '../../data/lifecycleFormSchemas';
 import {
     parseCsv,
@@ -250,6 +251,8 @@ function MasterDataSetImportCard({ user }) {
     const [dropdownWarnings, setDropdownWarnings] = useState([]);
     const [importing, setImporting] = useState(false);
     const [results, setResults] = useState(null); // { posted, failed, items }
+    const previewPg = usePagination(rows);
+    const resultsPg = usePagination(results?.items ?? []);
 
     function downloadTemplate() {
         downloadCsv('master-data-set-template.csv', buildUnifiedTemplateCsv());
@@ -389,7 +392,7 @@ function MasterDataSetImportCard({ user }) {
             <table className="table" style={{ fontSize: 12 }}>
               <thead><tr><th>Line</th><th>Asset #</th><th>Event</th></tr></thead>
               <tbody>
-                {rows.slice(0, 50).map((r) => (<tr key={r.__line}>
+                {previewPg.pageItems.map((r) => (<tr key={r.__line}>
                     <td>{r.__line}</td>
                     <td className="mono">{r.assetNumber}</td>
                     <td>{r.eventType}</td>
@@ -397,7 +400,7 @@ function MasterDataSetImportCard({ user }) {
               </tbody>
             </table>
           </div>
-          {rows.length > 50 && <p className="text-sm text-muted">…and {rows.length - 50} more.</p>}
+          <Pagination {...previewPg.pager}/>
           <Button variant="primary" size="sm" className="mt-2" onClick={importAll} disabled={!canImport || importing || rowProblems.length > 0} title={!canImport ? 'You have view-only access to Bulk Import' : undefined}>
             {importing ? 'Importing…' : `Import All (${rows.length})`}
           </Button>
@@ -407,7 +410,7 @@ function MasterDataSetImportCard({ user }) {
           <table className="table" style={{ fontSize: 12 }}>
             <thead><tr><th>Line</th><th>Asset #</th><th>Event</th><th>Result</th></tr></thead>
             <tbody>
-              {results.items.map((r, i) => (<tr key={i}>
+              {resultsPg.pageItems.map((r, i) => (<tr key={i}>
                   <td>{r.line}</td>
                   <td className="mono">{r.assetNumber || '(none)'}</td>
                   <td>{r.eventType}</td>
@@ -417,6 +420,7 @@ function MasterDataSetImportCard({ user }) {
                 </tr>))}
             </tbody>
           </table>
+          <Pagination {...resultsPg.pager}/>
         </div>)}
     </div>);
 }
@@ -431,4 +435,8 @@ function MasterDataSetImportCard({ user }) {
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : BulkImport.jsx
 // ======================================================

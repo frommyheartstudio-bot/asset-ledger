@@ -71,6 +71,11 @@ async function additionBlockReason(assetNumber: string): Promise<string | null> 
   return null;
 }
 
+// ======================================================
+// Function : additionPreviewError
+// Purpose  : Returns an error message when an Addition preview is "Needs Attention" so it cannot be posted; null when it is fine.
+// ======================================================
+
 // An Addition whose calculation came back "Needs Attention" never actually
 // capitalized anything — it must not be posted, or it would burn the asset
 // number (the one-Addition rule) without creating a valid asset.
@@ -492,6 +497,11 @@ lifecycleRouter.get('/transactions/:assetNumber', async (req, res) => {
   }
 });
 
+// ======================================================
+// Function : toIsoUtc
+// Purpose  : Converts epoch seconds into a UTC ISO string so the browser shows the correct local time.
+// ======================================================
+
 // Postgres `timestamptz` can come back as a zone-less-looking string ('2026-09-19 10:00:00')
 // in the SERVER's timezone. `new Date()` in the browser reads that as the
 // BROWSER's local time, so every timestamp was shifted by the difference
@@ -503,6 +513,11 @@ function toIsoUtc(epochSeconds: string | number | undefined, fallback: string): 
   if (Number.isFinite(secs) && secs > 0) return new Date(secs * 1000).toISOString();
   return fallback;
 }
+
+// ======================================================
+// Function : safeParse
+// Purpose  : Parses JSON text and returns the fallback instead of throwing when it is malformed.
+// ======================================================
 
 // Small helper — the *_json columns come back as plain
 // strings; never let one malformed row take down the whole response.
@@ -520,4 +535,8 @@ function safeParse<T>(text: string, fallback: T): T {
 
 // ======================================================
 // END: Route Handlers
+// ======================================================
+
+// ======================================================
+// END OF FILE : lifecycle.ts
 // ======================================================

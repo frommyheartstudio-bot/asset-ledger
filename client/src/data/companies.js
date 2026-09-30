@@ -10,6 +10,10 @@
 //             company added to the asset data never breaks the picker.
 // ======================================================
 
+// ======================================================
+// START: Data & Helper Functions
+// ======================================================
+
 export const COMPANY_NAMES = {
   '5B': '5B Industrial Holdings, LLC',
   R9: 'R9 Manufacturing Corp.',
@@ -20,6 +24,18 @@ export const COMPANY_NAMES = {
   B579: 'B579 Holdings Corp.'
 };
 
+// ======================================================
+// Function : companyName
+// Purpose  : Returns the full company name for a short code, or the code itself when it is not mapped.
+// ======================================================
 export function companyName(code) {
   return COMPANY_NAMES[code] ?? code;
 }
+
+// ======================================================
+// END: Data & Helper Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : companies.js
+// ======================================================

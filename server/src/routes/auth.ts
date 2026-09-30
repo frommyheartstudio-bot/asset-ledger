@@ -15,6 +15,11 @@ import { addNotification, createUser, deleteNotification, emailTaken, listNotifi
 // Postgres (notifications table), so nothing disappears on its own —
 // a notification is removed only when the user clicks its X.
 type FeedEvent = { id: string; name: string; email: string; role: string; at: string; type: 'login' | 'registration' };
+// ======================================================
+// Function : pushEvent
+// Purpose  : Saves a sign-in / registration event to the notifications table; a save failure is logged, never thrown.
+// ======================================================
+
 async function pushEvent(event: FeedEvent) {
   try { await addNotification(event); } catch (err) { console.error('[notifications] could not save', err); }
 }
@@ -157,4 +162,8 @@ authRouter.delete('/notifications/:seq', async (req, res) => {
 
 // ======================================================
 // END: Route Handlers
+// ======================================================
+
+// ======================================================
+// END OF FILE : auth.ts
 // ======================================================

@@ -63,3 +63,7 @@ FROM asset_depreciation_schedule
 WHERE depreciation > 0
 GROUP BY "fiscalYear"
 ORDER BY "fiscalYear";
+
+-- ======================================================
+-- END OF FILE : schema-core.sql
+-- ======================================================

@@ -3,12 +3,12 @@
 // Purpose   : Page-level component for AssetDetail
 // ======================================================
 
-import { Fragment, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { assetsApi } from '../../api/assets.api';
 import { AppLayout } from '../../layout/AppLayout';
-import { Pill } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { Loader } from '../../components/common/Loader';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { AssetCard } from '../../components/asset/AssetCard';
@@ -18,6 +18,8 @@ import { PostEventMenu } from '../../components/asset/PostEventMenu';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
 import { useAuth } from '../../context/AuthContext';
+import { BookSelect } from '../../components/ui/BookSelect';
+import { DEFAULT_BOOK, FALLBACK_BOOK_NAMES } from '../../data/books';
 
 // ======================================================
 // START: Page Component
@@ -25,6 +27,10 @@ import { useAuth } from '../../context/AuthContext';
 
 const TABS = ['Overview', 'Depreciation Schedule', 'Transactions', 'Documents', 'Audit Trail'];
 
+// ======================================================
+// Function : round2
+// Purpose  : Rounds a number to 2 decimal places.
+// ======================================================
 function round2(n) {
     return Math.round(n * 100) / 100;
 }
@@ -40,6 +46,17 @@ export function AssetDetail() {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
     const [tab, setTab] = useState('Overview');
+    // Which book's view of this asset every table below shows. Opens on the
+    // book the Asset Register was on (?book=), else Federal Tax.
+    const [searchParams] = useSearchParams();
+    const [book, setBook] = useState(() => {
+        const fromUrl = searchParams.get('book');
+        return fromUrl && FALLBACK_BOOK_NAMES.includes(fromUrl) ? fromUrl : DEFAULT_BOOK;
+    });
+    const [bookLoading, setBookLoading] = useState(false);
+    // Latest book/asset, so a months request that finishes after a switch can be ignored.
+    const scopeRef = useRef('');
+    const [reloadToken, setReloadToken] = useState(0);
     // Depreciation Schedule (Federal Tax) — clicking a Year row expands it
     // into that year's 12 months, each with its own calculated
     // depreciation amount. Only one year open at a time; months are
@@ -48,28 +65,42 @@ export function AssetDetail() {
     const [expandedYear, setExpandedYear] = useState(null);
     const [monthlyByYear, setMonthlyByYear] = useState({});
     const [monthlyLoading, setMonthlyLoading] = useState(false);
+    const schedulePg = usePagination(data?.depreciationSchedule ?? []);
     const [monthlyError, setMonthlyError] = useState(null);
 
     function load() {
         setData(null);
         setError(null);
-        assetsApi.getByNumber(assetNumber)
-            .then(setData)
-            .catch((err) => setError(err.message ?? 'Failed to load asset'));
+        setReloadToken((t) => t + 1);
     }
 
+    // Loads the asset as the chosen book sees it. Changing only the book
+    // keeps the old numbers on screen (dimmed) until the new ones arrive
+    // instead of blanking the page; a stale answer for a book the person
+    // already switched away from is dropped.
     useEffect(() => {
-        load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [assetNumber]);
+        let alive = true;
+        setBookLoading(true);
+        setError(null);
+        assetsApi.getByNumber(assetNumber, book)
+            .then((res) => { if (alive) setData(res); })
+            .catch((err) => { if (alive) setError(err.message ?? 'Failed to load asset'); })
+            .finally(() => { if (alive) setBookLoading(false); });
+        return () => { alive = false; };
+    }, [assetNumber, book, reloadToken]);
 
-    // A fresh asset means a fresh set of years — don't carry the previous
-    // asset's expanded row or cached months over when navigating between
-    // Asset Detail pages.
+    // A fresh asset or a different book means a fresh set of months — don't
+    // carry the previous expanded row or cached months over.
     useEffect(() => {
+        scopeRef.current = `${assetNumber}|${book}`;
         setExpandedYear(null);
         setMonthlyByYear({});
         setMonthlyError(null);
+    }, [assetNumber, book]);
+
+    // Navigating to another asset starts from a clean slate.
+    useEffect(() => {
+        setData(null);
     }, [assetNumber]);
 
     function toggleYear(row) {
@@ -83,9 +114,10 @@ export function AssetDetail() {
         setMonthlyError(null);
         if (!monthlyByYear[year]) {
             setMonthlyLoading(true);
-            assetsApi.getAssetMonthlyDepreciation(assetNumber, year)
-                .then((res) => setMonthlyByYear((prev) => ({ ...prev, [year]: res.months })))
-                .catch((err) => setMonthlyError(err.message || 'Failed to load monthly detail'))
+            const scope = `${assetNumber}|${book}`;
+            assetsApi.getAssetMonthlyDepreciation(assetNumber, year, book)
+                .then((res) => { if (scopeRef.current === scope) setMonthlyByYear((prev) => ({ ...prev, [year]: res.months })); })
+                .catch((err) => { if (scopeRef.current === scope) setMonthlyError(err.message || 'Failed to load monthly detail'); })
                 .finally(() => setMonthlyLoading(false));
         }
     }
@@ -130,7 +162,7 @@ export function AssetDetail() {
         <AssetCard asset={asset}/>
       </div>
 
-      <div className="grid grid-4 mb-4">
+      <div className="grid grid-4 mb-4" style={bookLoading ? { opacity: 0.6 } : undefined}>
         <div className="card card-pad stat">
           <span className="label">Gross Cost</span>
           <div className="value" style={{ fontSize: 22 }}>
@@ -169,8 +201,8 @@ export function AssetDetail() {
       {tab === 'Overview' && (<div className="grid grid-2">
           <div className="card">
             <div className="card-head">
-              <h3>Tax Fact Pattern</h3>
-              <Pill tone="blue">Federal Tax</Pill>
+              <h3>{book === DEFAULT_BOOK ? 'Tax Fact Pattern' : 'Book Fact Pattern'}</h3>
+              <BookSelect value={book} onChange={setBook} disabled={bookLoading}/>
             </div>
             <div className="card-pad">
               {asset.taxFactPattern ? (<table className="table" style={{ fontSize: 13 }}>
@@ -230,9 +262,18 @@ export function AssetDetail() {
 
       {(tab === 'Overview' || tab === 'Depreciation Schedule') && (<div className="card mt-4">
           <div className="card-head">
-            <h3>Depreciation Schedule (Federal Tax)</h3>
-            <span className="text-sm text-muted">Projected through life · click a year for the monthly breakdown</span>
+            <h3>Depreciation Schedule ({book})</h3>
+            <div className="card-head-controls">
+              <BookSelect value={book} onChange={setBook} disabled={bookLoading}/>
+              <span className="text-sm text-muted">Projected through life · click a year for the monthly breakdown</span>
+            </div>
           </div>
+          {book !== DEFAULT_BOOK && asset.ruleSource === 'federal-mirror' && (<p className="book-note">
+              No {book}-specific rule for asset class {asset.assetClass || '—'}, so these figures mirror Federal Tax. Add one in Configuration → Asset Classes → Customize Table.
+            </p>)}
+          {book !== DEFAULT_BOOK && asset.ruleSource === 'book-rule' && (<p className="book-note">
+              Calculated from the {asset.ruleName} rule in Configuration → Asset Classes.
+            </p>)}
           {depreciationSchedule.length === 0 ? (<div className="card-pad">
               <p className="text-muted text-sm">No projected schedule available for this asset yet.</p>
             </div>) : (<div className="table-wrap">
@@ -248,7 +289,7 @@ export function AssetDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {depreciationSchedule.map((row) => {
+                  {schedulePg.pageItems.map((row) => {
                     const year = Number(row.year.match(/\d{4}/)?.[0]);
                     const isOpen = expandedYear === year;
                     return (<Fragment key={row.year}>
@@ -320,6 +361,7 @@ export function AssetDetail() {
                   })}
                 </tbody>
               </table>
+              <Pagination {...schedulePg.pager}/>
             </div>)}
         </div>)}
 
@@ -354,4 +396,8 @@ export function AssetDetail() {
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : AssetDetail.jsx
 // ======================================================

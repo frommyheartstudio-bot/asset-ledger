@@ -135,6 +135,28 @@ CREATE TABLE IF NOT EXISTS asset_classes
     life            TEXT NOT NULL
 );
 
+-- ---------- Configuration -> Asset Classes -> "Customize Table" ----------
+-- 3 rows (seeded on first read, see db/repo.ts). Name shown in the UI is
+-- "<book> - <assetType>", e.g. "GAAP - Acquisition".
+CREATE TABLE IF NOT EXISTS asset_class_custom_table
+(
+    id              SERIAL PRIMARY KEY,
+    book            TEXT NOT NULL,
+    "assetType"     TEXT NOT NULL,
+    "propertyType"  TEXT NOT NULL,
+    method          TEXT NOT NULL,
+    "ratePct"       TEXT NOT NULL,
+    convention      TEXT NOT NULL,
+    life            TEXT NOT NULL
+);
+
+-- Marker: the 3 starter rows above are inserted once; this records it so
+-- deleting every rule doesn't bring them back (created on demand by repo.ts too).
+CREATE TABLE IF NOT EXISTS asset_class_custom_seeded
+(
+    done BOOLEAN NOT NULL
+);
+
 -- ---------- activity.ts : dashboardSummary (single-row snapshot table) ----------
 CREATE TABLE IF NOT EXISTS dashboard_summary
 (
@@ -172,3 +194,7 @@ CREATE TABLE IF NOT EXISTS notifications
     at       TEXT NOT NULL DEFAULT '',
     type     TEXT NOT NULL DEFAULT 'login'
 );
+
+-- ======================================================
+-- END OF FILE : schema.sql
+-- ======================================================

@@ -5,6 +5,9 @@
 
 import { Router } from 'express';
 import { computeForecast } from '../data/activity.js';
+import { resolveBook } from '../data/books.js';
+import { primeBookRules } from '../services/book-view.js';
+import { isKnownBook } from '../data/books.js';
 import {
   generatedReports as seedGeneratedReports,
   reportCatalog as seedReportCatalog,
@@ -12,7 +15,7 @@ import {
   users as seedUsers
 } from '../data/admin.js';
 import { ASSET_CLASS_SEED } from '../data/assetClasses.js';
-import { createGeneratedReport, createUser, deleteUser, loadAdmin, loadAssetClasses, seedAdminIfEmpty, seedAssetClassesIfEmpty, updateRolePermissions, updateUser } from '../db/repo.js';
+import { createCustomAssetClass, createGeneratedReport, createUser, deleteCustomAssetClass, deleteUser, loadAdmin, loadAssetClasses, loadCustomAssetClasses, seedAdminIfEmpty, seedAssetClassesIfEmpty, updateCustomAssetClass, updateRolePermissions, updateUser } from '../db/repo.js';
 
 // ======================================================
 // Function : adminData
@@ -89,6 +92,11 @@ export const forecastingRouter = Router();
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
+// ======================================================
+// Function : parseCsvParam
+// Purpose  : Splits a comma-separated query value into a trimmed list; undefined when empty.
+// ======================================================
+
 // Company / Asset Type each arrive as a comma-separated list (checkbox
 // multi-select on the client) — an empty/missing value keeps the
 // portfolio-wide default, same as before this was a checkbox list.
@@ -98,10 +106,19 @@ function parseCsvParam(value: unknown): string[] | undefined {
   return parts.length ? parts : undefined;
 }
 
-forecastingRouter.get('/', (req, res) => res.json(computeForecast(Number(req.query.years) || 5, {
-  company: parseCsvParam(req.query.company),
-  assetType: parseCsvParam(req.query.assetType)
-})));
+forecastingRouter.get('/', async (req, res) => {
+  try {
+    const book = resolveBook(req.query.book);
+    await primeBookRules();
+    res.json(computeForecast(Number(req.query.years) || 5, {
+      company: parseCsvParam(req.query.company),
+      assetType: parseCsvParam(req.query.assetType)
+    }, book));
+  } catch (err) {
+    console.error('[forecasting] failed:', err);
+    res.status(500).json({ error: 'Failed to compute forecast' });
+  }
+});
 
 // ======================================================
 // END: GET /
@@ -194,6 +211,93 @@ configRouter.get('/asset-classes', async (_req, res) => {
 
 // ======================================================
 // END: GET /asset-classes
+// ======================================================
+
+// ======================================================
+// Function : /asset-classes/custom  (Customize Table)
+// Purpose  : 3 custom rows (Name, Property Type, Method, Rate %,
+//            Convention, Life), every column editable.
+// ======================================================
+
+// ======================================================
+// Function : str
+// Purpose  : Returns a trimmed string for string input, otherwise an empty string.
+// ======================================================
+
+const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+
+configRouter.get('/asset-classes/custom', async (_req, res) => {
+  try {
+    res.json(await loadCustomAssetClasses());
+  } catch (err) {
+    console.error('[asset-classes/custom] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load the customize table' });
+  }
+});
+
+// Function : validateCustomRow
+// Purpose  : Shared checks for adding / editing a custom rule row. Returns
+//            the cleaned fields, or an error message string.
+function validateCustomRow(body: unknown): { fields: { book: string; assetType: string; propertyType: string; method: string; ratePct: string; convention: string; life: string } } | { error: string } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const f = {
+    book: str(b.book), assetType: str(b.assetType),
+    propertyType: str(b.propertyType), method: str(b.method), ratePct: str(b.ratePct),
+    convention: str(b.convention), life: str(b.life)
+  };
+  const missing = Object.entries(f).filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length) return { error: `Missing or invalid: ${missing.join(', ')}` };
+  if (!isKnownBook(f.book)) return { error: `Unknown book "${f.book}"` };
+  if (f.ratePct !== 'N/A' && !(Number(f.ratePct) > 0)) return { error: 'Rate % must be a positive number or N/A' };
+  if (!/^\d+\s*years?\s*\d+\s*months?$/i.test(f.life)) return { error: 'Life must look like "10 years 0 months"' };
+  return { fields: f };
+}
+
+configRouter.post('/asset-classes/custom', async (req, res) => {
+  try {
+    const v = validateCustomRow(req.body);
+    if ('error' in v) return res.status(400).json({ error: v.error });
+    const created = await createCustomAssetClass(v.fields);
+    await primeBookRules(true); // the new rule applies to that book's tables right away
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('[asset-classes/custom POST] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not add the rule' });
+  }
+});
+
+configRouter.delete('/asset-classes/custom/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const ok = await deleteCustomAssetClass(id);
+    if (!ok) return res.status(404).json({ error: 'Row not found' });
+    await primeBookRules(true);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[asset-classes/custom DELETE] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not delete the rule' });
+  }
+});
+
+configRouter.put('/asset-classes/custom/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const v = validateCustomRow(req.body);
+    if ('error' in v) return res.status(400).json({ error: v.error });
+    const updated = await updateCustomAssetClass(id, v.fields);
+    if (!updated) return res.status(404).json({ error: 'Row not found' });
+    await primeBookRules(true); // an edited rule shows up in that book's tables right away
+    res.json(updated);
+  } catch (err) {
+    console.error('[asset-classes/custom PUT] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not save the row' });
+  }
+});
+
+// ======================================================
+// END: custom asset classes
 // ======================================================
 
 export const usersRouter = Router();
@@ -347,3 +451,6 @@ usersRouter.delete('/:id', async (req, res) => {
 // END: Route Handlers
 // ======================================================
 
+// ======================================================
+// END OF FILE : misc.ts
+// ======================================================

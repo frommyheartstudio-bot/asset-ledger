@@ -4,9 +4,11 @@
 // ======================================================
 
 import { Router } from 'express';
-import { calculateScenarioProjection } from '../services/depreciation.js';
+import { calculateScenarioProjection, round2 } from '../services/depreciation.js';
 import type { ScenarioInput } from '../types.js';
-import { assets, depreciationSchedules } from '../data/assets.js';
+import { assets } from '../data/assets.js';
+import { DEFAULT_BOOK, resolveBook } from '../data/books.js';
+import { primeBookRules, scheduleForBook } from '../services/book-view.js';
 
 
 // ======================================================
@@ -35,17 +37,6 @@ modelingRouter.get('/scenarios', (_req, res) => {
 });
 
 // ======================================================
-// Function : round2
-// Purpose  : Implements logic for 'round2'
-// ======================================================
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-// ======================================================
-// END: round2
-// ======================================================
-
-// ======================================================
 // Function : baselineFromSchedules
 // Purpose  : Scenario A (Baseline) for a filtered slice of the book.
 //            The simplified formula collapses to $0.00 in every year
@@ -58,14 +49,14 @@ function round2(n: number): number {
 // Input    : assetNumbers, startYear, years
 // Output   : { yearlyDeduction, cumulative }
 // ======================================================
-function baselineFromSchedules(assetNumbers: string[], startYear: number, years: number) {
+function baselineFromSchedules(assetNumbers: string[], startYear: number, years: number, book: string = DEFAULT_BOOK) {
   const wanted = new Set(assetNumbers);
   const yearly: number[] = Array.from({ length: years }, () => 0);
 
   for (const a of assets) {
     if (!wanted.has(a.assetNumber)) continue;
     const dYear = a.status === 'Retired' && a.disposal?.disposalDate ? Number(a.disposal.disposalDate.slice(0, 4)) : null;
-    const rows = depreciationSchedules[a.assetNumber] ?? [];
+    const rows = scheduleForBook(a, book);
     for (let i = 0; i < years; i++) {
       const year = startYear + i;
       if (dYear !== null && dYear <= year) continue;
@@ -80,7 +71,9 @@ function baselineFromSchedules(assetNumbers: string[], startYear: number, years:
 }
 
 // POST /api/modeling/compare — { basis?: number, scenarios: ScenarioInput[], baselineAssetNumbers?: string[], startYear?: number, bonusPctByYear?: number[] }
-modelingRouter.post('/compare', (req, res) => {
+modelingRouter.post('/compare', async (req, res) => {
+  const book = resolveBook(req.body?.book);
+  await primeBookRules();
   const basis = Number(req.body?.basis ?? DEFAULT_BASIS);
   const scenarios: ScenarioInput[] = req.body?.scenarios ?? DEFAULT_SCENARIOS;
   const baselineAssetNumbers: string[] = Array.isArray(req.body?.baselineAssetNumbers) ? req.body.baselineAssetNumbers : [];
@@ -102,7 +95,7 @@ modelingRouter.post('/compare', (req, res) => {
   // even though A (and therefore the "real" picture) was still ongoing.
   const aProjected = calculateScenarioProjection(basis, scenarios[0]);
   const aResult = baselineAssetNumbers.length > 0
-    ? { ...aProjected, ...baselineFromSchedules(baselineAssetNumbers, startYear, aProjected.yearlyDeduction.length) }
+    ? { ...aProjected, ...baselineFromSchedules(baselineAssetNumbers, startYear, aProjected.yearlyDeduction.length, book) }
     : aProjected;
   const aYearly = aResult.yearlyDeduction;
 
@@ -132,7 +125,7 @@ modelingRouter.post('/compare', (req, res) => {
       ...(i === 1 ? { bonusPctByYear: aYearly.map((_, yearIdx) => pctForYear(yearIdx)) } : {})
     };
   });
-  res.json({ basis, results });
+  res.json({ book, basis, results });
 });
 
 // ======================================================
@@ -143,3 +136,6 @@ modelingRouter.post('/compare', (req, res) => {
 // END: Route Handlers
 // ======================================================
 
+// ======================================================
+// END OF FILE : modeling.ts
+// ======================================================

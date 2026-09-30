@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { BONUS_DATA } from '../../data/bonusDepreciation';
 
 // ======================================================
@@ -49,12 +50,20 @@ const VEHICLE_LIMITS = [
     { year: '2018', y1Bonus: '$18,000', y1NoBonus: '$10,000', y2: '$16,000', y3: '$9,600', y4: '$5,760' }
 ];
 
+// ======================================================
+// Function : pctTone
+// Purpose  : Returns the pill colour class for a bonus percentage (green 100+, amber 40+, red below).
+// ======================================================
 function pctTone(pct) {
     if (pct >= 100) return 'pill-green';
     if (pct >= 40) return 'pill-amber';
     return 'pill-red';
 }
 
+// ======================================================
+// Function : downloadBonusCSV
+// Purpose  : Exports the bonus depreciation table as a CSV file.
+// ======================================================
 function downloadBonusCSV() {
     const rows = ['Year Placed in Service,Bonus %,Longer Production Period %,Legislative Authority,Notes'];
     BONUS_DATA.forEach((r) => {
@@ -74,6 +83,7 @@ function downloadBonusCSV() {
 
 export function BonusDepreciation() {
     const [tab, setTab] = useState('timeline');
+    const bonusPg = usePagination(BONUS_DATA);
 
     const rulesColumns = [
         { header: 'Requirement', render: (r) => <strong>{r.requirement}</strong> },
@@ -141,7 +151,7 @@ export function BonusDepreciation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {BONUS_DATA.map((row) => (<tr key={row.year} style={row.highlight ? { background: '#f0fdf4' } : undefined}>
+                  {bonusPg.pageItems.map((row) => (<tr key={row.year} style={row.highlight ? { background: '#f0fdf4' } : undefined}>
                       <td>{row.year}</td>
                       <td className="num"><span className={`pill ${pctTone(row.pct)}`}>{row.pct}%</span></td>
                       <td>{row.lpp !== row.pct ? `${row.lpp}%` : '—'}</td>
@@ -151,6 +161,7 @@ export function BonusDepreciation() {
                 </tbody>
               </table>
             </div>
+            <Pagination {...bonusPg.pager}/>
           </div>
         </>)}
 
@@ -200,4 +211,8 @@ export function BonusDepreciation() {
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : BonusDepreciation.jsx
 // ======================================================

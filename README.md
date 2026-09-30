@@ -59,6 +59,40 @@ needed in dev even though `cors()` is enabled server-side too.
   `client/src/styles.css`; a few page-scoped `<style>` blocks
   (lifecycle event picker, report cards, user avatars) were merged in.
 
+## 📚 Books (multi-book ledger)
+
+The ledger used to maintain ONE book (Federal Tax). It now maintains every book on the
+Books List (GAAP, Federal Tax, Federal Tax - E&P, DE, IA, IL, MS, NE, OK, OR, State AMT - QIP,
+State No Bonus, State No Bonus - AMT, State QIP, TN). Every table has a **Book** dropdown;
+picking a book reloads that table with that book's numbers. Federal Tax is still the default
+and is exactly the data the app always showed.
+
+**How a book's numbers are produced** (`server/src/services/book-view.ts`):
+
+| Situation | What the table shows |
+|---|---|
+| Book = Federal Tax | The stored data, untouched. |
+| Book has a rule for the asset's class (a row in **Configuration → Asset Classes → Customize Table** with that Book + asset type) | A schedule built from that rule's method / rate / convention / life. Accumulated depreciation and NBV are recomputed from it. |
+| Book has NO rule for the asset's class | Mirrors Federal Tax, and the table says so in a note. |
+
+Cost, in-service date and status are shared by all books; only depreciation differs.
+Use **+ Add Rule** on the Customize Table to give a book its own treatment for an asset class.
+
+| Table / page | Book dropdown |
+|---|---|
+| Dashboard → Monthly Depreciation, Assets by Class (and the KPI cards) | yes |
+| Asset Register → Assets | yes (row click opens Asset Detail on the same book) |
+| Asset Detail → Fact Pattern, Depreciation Schedule (and monthly drill-down) | yes |
+| Planning → Forecasting → both tables | yes |
+| Planning → Modeling → both tables | yes |
+| Compliance → Reporting → Recently Generated (filter) and report generation (multi-select; CSV has a Book column, one block of rows per book) | yes |
+| Asset Detail → Transactions / Audit Trail, Lifecycle posted events | no — an event posts once for all books, so there is one list |
+
+API: `GET /api/books`; `?book=` on `/api/assets`, `/api/assets/:n`, `/api/assets/:n/monthly-depreciation`,
+`/api/dashboard/summary`, `/api/dashboard/monthly-depreciation`, `/api/forecasting`; `book` in the body of
+`POST /api/modeling/compare`. Unknown / missing book = Federal Tax. Rules: `POST` / `PUT` / `DELETE`
+`/api/config/asset-classes/custom`.
+
 ## 🗂️ Where is everything? (file map)
 
 ```

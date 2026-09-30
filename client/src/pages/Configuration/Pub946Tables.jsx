@@ -7,7 +7,9 @@
 import { useMemo, useState } from 'react';
 import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { PUB946_TABLES } from '../../data/pub946Tables';
+import { downloadCsv } from '../../utils/csv';
 
 // ======================================================
 // START: Page Component
@@ -20,7 +22,11 @@ const CONVENTIONS = [
     { value: 'MM', label: 'Mid-Month' }
 ];
 
-function downloadCSV(table) {
+// ======================================================
+// Function : exportTableCsv
+// Purpose  : Exports the selected Pub 946 percentage table as a CSV file.
+// ======================================================
+function exportTableCsv(table) {
     const rows = [['Year', ...table.columns].join(',')];
     const maxRows = Math.max(...table.data.map((col) => col.length));
     for (let r = 0; r < maxRows; r++) {
@@ -28,11 +34,7 @@ function downloadCSV(table) {
         table.data.forEach((col) => row.push(r < col.length && col[r] !== null ? col[r] : ''));
         rows.push(row.join(','));
     }
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${table.id.replace(/\s/g, '_')}.csv`;
-    a.click();
+    downloadCsv(`${table.id.replace(/\s/g, '_')}.csv`, rows.join('\n'));
 }
 
 // ======================================================
@@ -48,6 +50,9 @@ export function Pub946Tables() {
 
     const maxRows = table ? Math.max(...table.data.map((col) => col.length)) : 0;
     const totals = table ? table.data.map((col) => col.reduce((sum, v) => sum + (v !== null ? v : 0), 0)) : [];
+
+    const yearRows = useMemo(() => Array.from({ length: maxRows }, (_, r) => r), [maxRows]);
+    const yearPg = usePagination(yearRows);
 
     return (<AppLayout active="pub946" title="Pub 946 Tables" crumb="Home / Configuration / Pub 946 Tables">
       <div className="page-header">
@@ -71,7 +76,7 @@ export function Pub946Tables() {
               {CONVENTIONS.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
             </select>
           </div>
-          <Button variant="ghost" onClick={() => table && downloadCSV(table)} style={{ marginLeft: 'auto' }}>
+          <Button variant="ghost" onClick={() => table && exportTableCsv(table)} style={{ marginLeft: 'auto' }}>
             Export CSV
           </Button>
         </div>
@@ -93,7 +98,7 @@ export function Pub946Tables() {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: maxRows }).map((_, r) => (<tr key={r}>
+                {yearPg.pageItems.map((r) => (<tr key={r}>
                     <td className="mono">{r + 1}</td>
                     {table.data.map((col, ci) => (<td key={ci} className="num">
                         {r < col.length && col[r] !== null ? `${col[r].toFixed(3)}%` : ''}
@@ -106,6 +111,7 @@ export function Pub946Tables() {
               </tbody>
             </table>
           </div>
+          <Pagination {...yearPg.pager}/>
         </div>)}
 
       <div className="card mt-4">
@@ -123,4 +129,8 @@ export function Pub946Tables() {
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : Pub946Tables.jsx
 // ======================================================

@@ -9,6 +9,15 @@
 
 import { pool } from '../src/db/postgres.js';
 
+// ======================================================
+// START: Script Functions
+// ======================================================
+
+// ======================================================
+// Function : main
+// Purpose  : One-off fix: updates user u1 to the Balaji admin login and Administrator role.
+// ======================================================
+
 async function main(): Promise<void> {
   const result = await pool.query(
     `UPDATE users
@@ -36,3 +45,11 @@ main().catch((err) => {
   console.error('Error:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
+
+// ======================================================
+// END: Script Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : set-balaji-admin.ts
+// ======================================================

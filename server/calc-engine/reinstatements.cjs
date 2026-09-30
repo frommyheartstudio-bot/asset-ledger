@@ -21,7 +21,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
 // ── Step 1: Validate Inputs ──────────────────────────────────
 // ======================================================
 // Function : validateReinstatementInput
-// Purpose  : Implements logic for 'validateReinstatementInput'
+// Purpose  : Step 1: checks the required Reinstatement inputs (disposal and reinstatement dates, cost) and returns the errors.
 // ======================================================
 
 function validateReinstatementInput(input) {
@@ -60,7 +60,7 @@ function validateReinstatementInput(input) {
 // ── Step 2: Determine Reinstatement Timing ───────────────────
 // ======================================================
 // Function : determineReinstatementTiming
-// Purpose  : Implements logic for 'determineReinstatementTiming'
+// Purpose  : Step 2: decides whether the Reinstatement is current-period or backdated.
 // ======================================================
 
 function determineReinstatementTiming(input) {
@@ -120,7 +120,7 @@ function determineReinstatementTiming(input) {
 // ── Step 3: Restore Cost and A/D ─────────────────────────────
 // ======================================================
 // Function : restoreCostAndAD
-// Purpose  : Implements logic for 'restoreCostAndAD'
+// Purpose  : Step 3: restores the original cost and accumulated depreciation as of the reinstatement date.
 // ======================================================
 
 function restoreCostAndAD(input, timingResult) {
@@ -145,7 +145,7 @@ function restoreCostAndAD(input, timingResult) {
 // ── Step 4: Reverse Gain/Loss ────────────────────────────────
 // ======================================================
 // Function : reverseGainLoss
-// Purpose  : Implements logic for 'reverseGainLoss'
+// Purpose  : Step 4: reverses the gain / loss recorded on the original disposal in the current period.
 // ======================================================
 
 function reverseGainLoss(input, timingResult) {
@@ -294,7 +294,7 @@ function calculateReinstatementRevision(input, timingResult, restoredResult, res
 // ── Step 7: Build Reinstatement DDV ──────────────────────────
 // ======================================================
 // Function : buildReinstatementDDV
-// Purpose  : Implements logic for 'buildReinstatementDDV'
+// Purpose  : Builds the Depreciation Detail View (restored cost, A/D, resumed depreciation, revision).
 // ======================================================
 
 function buildReinstatementDDV(input, timingResult, restoredResult, gainLossResult, resumedDeprResult, revisionResult) {
@@ -337,7 +337,7 @@ function buildReinstatementDDV(input, timingResult, restoredResult, gainLossResu
 // ── Step 8: Validate Reinstatement Post-Processing ───────────
 // ======================================================
 // Function : validateReinstatementPostProcessing
-// Purpose  : Implements logic for 'validateReinstatementPostProcessing'
+// Purpose  : Runs the post-processing checks (cost restoration, A/D, gain/loss reversal) within a tolerance of 0.02.
 // ======================================================
 
 function validateReinstatementPostProcessing(input, restoredResult, gainLossResult, ddv, revisionResult) {
@@ -470,7 +470,7 @@ function calculateReinstatement(input) {
 // ── Flowchart Definition Builder ─────────────────────────────
 // ======================================================
 // Function : buildReinstatementFlowchartDefinition
-// Purpose  : Implements logic for 'buildReinstatementFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildReinstatementFlowchartDefinition(activePath, result) {
@@ -635,3 +635,6 @@ module.exports = { calculateReinstatement: calculateReinstatement };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : reinstatements.cjs
+// ======================================================

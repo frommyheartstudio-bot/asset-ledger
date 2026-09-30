@@ -24,6 +24,10 @@
 import { createRequire } from 'node:module';
 import type { Asset, DepreciationScheduleRow } from '../types.js';
 
+// ======================================================
+// START: Service Functions
+// ======================================================
+
 const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RATE_TABLES = require('../../calc-engine/rate-tables.cjs');
@@ -148,6 +152,11 @@ export function recoveryYears(asset: Asset): number {
 //            than inventing a rate.
 // ======================================================
 
+// ======================================================
+// Function : engineMethod
+// Purpose  : Maps an asset method to the method name the calc-engine understands.
+// ======================================================
+
 function engineMethod(asset: Asset): string {
   const m = `${asset.taxFactPattern?.method ?? asset.method ?? ''}`.toLowerCase();
   if (m.includes('150')) return 'MACRS 150DB';
@@ -156,12 +165,22 @@ function engineMethod(asset: Asset): string {
   return 'MACRS';
 }
 
+// ======================================================
+// Function : engineConvention
+// Purpose  : Maps an asset convention to the convention code the calc-engine understands.
+// ======================================================
+
 function engineConvention(asset: Asset): string {
   const c = `${asset.taxFactPattern?.convention ?? asset.method ?? ''}`.toLowerCase();
   if (c.includes('mid-month') || c.includes('mid month') || c.includes('mm')) return 'Mid-Month';
   if (c.includes('quarter') || c.includes('mq')) return 'MQ';
   return 'HY';
 }
+
+// ======================================================
+// Function : rateForYear
+// Purpose  : Looks up the depreciation rate % for a year from the rate tables; null when the lookup fails or gives no rate.
+// ======================================================
 
 function rateForYear(asset: Asset, life: number, year: number, monthPIS: number): number | null {
   try {
@@ -279,6 +298,19 @@ export function ensureSchedules(
 // END: ensureSchedules
 // ======================================================
 
-function round2(n: number): number {
+// ======================================================
+// Function : round2
+// Purpose  : Rounds a number to 2 decimal places.
+// ======================================================
+
+export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// ======================================================
+// END: Service Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : schedule-builder.ts
+// ======================================================

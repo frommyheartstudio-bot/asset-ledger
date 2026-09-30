@@ -1,3 +1,13 @@
+// ======================================================
+// File Name : bonusDepreciation.js
+// Purpose   : IRC 168(k) bonus depreciation rate table (BONUS_DATA) shown on
+//             Configuration -> Bonus Depreciation.
+// ======================================================
+
+// ======================================================
+// START: Data Definitions
+// ======================================================
+
 // ============================================================
 // Bonus Depreciation Rates – IRC §168(k)
 // Historical and current additional first-year depreciation percentages
@@ -37,3 +47,11 @@ export const BONUS_DATA = [
   { year: '2001 (after 9/10/2001)', pct: 30, lpp: 30, law: 'JCWAA §168(k)', notes: '30% bonus; property acquired after 9/10/2001' },
   { year: 'Before 9/11/2001', pct: 0, lpp: 0, law: 'N/A', notes: 'No bonus depreciation provision existed' }
 ];
+
+// ======================================================
+// END: Data Definitions
+// ======================================================
+
+// ======================================================
+// END OF FILE : bonusDepreciation.js
+// ======================================================

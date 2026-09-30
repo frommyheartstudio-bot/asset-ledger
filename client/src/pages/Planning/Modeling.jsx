@@ -9,11 +9,15 @@ import { assetsApi } from '../../api/assets.api';
 import { AppLayout } from '../../layout/AppLayout';
 import { BarsChart } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { Select } from '../../components/ui/Input';
 import { MultiSelect } from '../../components/ui/MultiSelect';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { companyName } from '../../data/companies';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
+import { BookSelect } from '../../components/ui/BookSelect';
+import { DEFAULT_BOOK } from '../../data/books';
 
 // ======================================================
 // START: Page Component
@@ -25,18 +29,7 @@ const TONE_PILL = { 0: 'blue', 1: 'purple', 2: 'amber' };
 // Purpose  : React component that renders the 'Modeling' UI
 // ======================================================
 
-const BOOK_OPTIONS = ['Federal Tax', 'GAAP', 'State No Bonus'];
 const PROJECTION_YEARS = 4;
-
-// Defaults a checkbox MultiSelect to "everything selected" once its
-// option list is actually known (Company's is empty on first render,
-// before the asset list has loaded).
-function useAutoSelectAll(options, selected, setSelected) {
-    useEffect(() => {
-        if (options.length && selected.length === 0) setSelected(options.map((o) => o.value));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options]);
-}
 
 export function Modeling() {
     const [basis, setBasis] = useState(1_000_000);
@@ -53,7 +46,10 @@ export function Modeling() {
     // doesn't change the numbers. Company and Asset Type are read from
     // the real asset list, not a hardcoded guess, so the picker never
     // drifts from what's actually on the book.
-    const [books, setBooks] = useState(BOOK_OPTIONS);
+    // One book at a time — the assets (their method / recovery / schedules) and
+    // both result tables below are computed from that book. Picking another
+    // book reloads the assets and re-runs the comparison straight away.
+    const [book, setBook] = useState(DEFAULT_BOOK);
     const [companies, setCompanies] = useState([]);
     const assetClassNames = useAssetClasses();
     const ASSET_TYPE_OPTIONS = useMemo(() => assetClassNames.map((c) => ({ value: c, label: c })), [assetClassNames]);
@@ -70,9 +66,20 @@ export function Modeling() {
     // new default from that year on, until the next override.
     const [bonusBase, setBonusBase] = useState(40);
     const bonusPctByYear = useMemo(() => Array(PROJECTION_YEARS).fill(bonusBase), [bonusBase]);
+    // pendingRerun: set once a NEW book's assets have arrived, so the
+    // comparison below re-runs with that book's data (not the old one's).
+    const [pendingRerun, setPendingRerun] = useState(false);
+    const bookLoadedOnce = useRef(false);
     useEffect(() => {
-        assetsApi.list({}).then((res) => setAllAssets(res.items ?? []));
-    }, []);
+        let alive = true;
+        assetsApi.list({ book }).then((res) => {
+            if (!alive) return;
+            setAllAssets(res.items ?? []);
+            if (bookLoadedOnce.current) setPendingRerun(true);
+            bookLoadedOnce.current = true;
+        }).catch((err) => console.error('Failed to load assets for modeling:', err));
+        return () => { alive = false; };
+    }, [book]);
     const companyOptions = useMemo(() => {
         const codes = [...new Set(allAssets.map((a) => a.company).filter(Boolean))].sort();
         return codes.map((code) => ({ value: code, label: companyName(code) }));
@@ -162,7 +169,7 @@ export function Modeling() {
         setResults([]);
         for (let upTo = 1; upTo <= effectiveScenarios.length; upTo++) {
             const scenariosSoFar = effectiveScenarios.slice(0, upTo);
-            const res = await reportsApi.compareModelingScenarios(effectiveBasis, scenariosSoFar, baselineAssetNumbers, 2026, bonusPctByYear);
+            const res = await reportsApi.compareModelingScenarios(effectiveBasis, scenariosSoFar, baselineAssetNumbers, 2026, bonusPctByYear, book);
             setResults(res.results);
         }
         setIsSubmitting(false);
@@ -177,12 +184,23 @@ export function Modeling() {
         runComparison();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [effectiveScenarios]);
+    // A different book's assets just landed — run the comparison again on them.
+    useEffect(() => {
+        if (!pendingRerun || isSubmitting)
+            return;
+        setPendingRerun(false);
+        runComparison();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingRerun, allAssets]);
     function updateScenario(i, patch) {
         setScenarios((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
     }
     function handleSubmit() {
         runComparison();
     }
+    const yearIdxs = Array.from({ length: results[0]?.yearlyDeduction.length ?? 0 }, (_, i) => i);
+    const yearPg = usePagination(yearIdxs);
+
     return (<AppLayout active="modeling" title="Modeling" crumb="Home / Planning / Modeling">
       <div className="page-header">
         <div>
@@ -193,8 +211,7 @@ export function Modeling() {
       </div>
 
       <div className="card card-pad mb-4">
-        <div className="grid grid-3">
-          <MultiSelect label="Book" options={BOOK_OPTIONS.map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks} allLabel="All Books"/>
+        <div className="grid grid-2">
           <MultiSelect label="Company" options={companyOptions} selected={companies} onChange={setCompanies} allLabel="All Companies"/>
           <MultiSelect label="Asset Type" options={ASSET_TYPE_OPTIONS} selected={assetTypes} onChange={setAssetTypes} allLabel="All Types"/>
         </div>
@@ -277,8 +294,11 @@ export function Modeling() {
 
       <div className="card mb-4">
         <div className="card-head">
-          <h3>First-Year Deduction Comparison</h3>
-          <span className="text-sm text-muted">Asset basis {formatCurrency(effectiveBasis, { compact: true })}</span>
+          <h3>First-Year Deduction Comparison ({book})</h3>
+          <div className="card-head-controls">
+            <BookSelect value={book} onChange={setBook} disabled={isSubmitting}/>
+            <span className="text-sm text-muted">Asset basis {formatCurrency(effectiveBasis, { compact: true })}</span>
+          </div>
         </div>
         <div className="card-pad">
           <BarsChart height={220} data={results.map((r, i) => ({
@@ -291,7 +311,8 @@ export function Modeling() {
 
       <div className="card">
         <div className="card-head">
-          <h3>Side-by-Side Projection</h3>
+          <h3>Side-by-Side Projection ({book})</h3>
+          <BookSelect value={book} onChange={setBook} disabled={isSubmitting}/>
         </div>
         <div className="table-wrap">
           <table className="table">
@@ -304,7 +325,7 @@ export function Modeling() {
               </tr>
             </thead>
             <tbody>
-              {results[0]?.yearlyDeduction.map((_, yearIdx) => (<tr key={yearIdx}>
+              {yearPg.pageItems.map((yearIdx) => (<tr key={yearIdx}>
                   <td>{2026 + yearIdx}</td>
                   {results.map((r) => (<td className="num" key={r.label}>
                       {formatCurrency(r.yearlyDeduction[yearIdx] ?? 0, { compact: true })}
@@ -319,6 +340,7 @@ export function Modeling() {
             </tbody>
           </table>
         </div>
+        <Pagination {...yearPg.pager}/>
       </div>
 
     </AppLayout>);
@@ -332,3 +354,6 @@ export function Modeling() {
 // END: Page Component
 // ======================================================
 
+// ======================================================
+// END OF FILE : Modeling.jsx
+// ======================================================

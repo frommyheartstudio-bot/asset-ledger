@@ -1,3 +1,8 @@
+/* ====================================================== */
+/* File Name : login.css */
+/* Purpose   : Styles for the standalone full-screen Login page. */
+/* ====================================================== */
+
 /* Standalone full-screen login page — outside the app shell, so no sidebar/header tokens needed here. */
 
 .login-screen {
@@ -41,3 +46,7 @@
 }
 
 .login-hint { text-align: center; font-size: 11px; color: var(--text-light); margin-top: 18px; }
+
+/* ====================================================== */
+/* END OF FILE : login.css */
+/* ====================================================== */

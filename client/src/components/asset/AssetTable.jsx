@@ -35,7 +35,7 @@ export function AssetTable({ assets, onSelect, selection }) {
         { header: 'Method', render: (a) => a.method },
         { header: 'Status', render: (a) => <Pill tone={STATUS_TONE[a.status] ?? 'gray'}>{a.status}</Pill> }
     ];
-    return <Table columns={columns} rows={assets} rowKey={(a) => a.assetNumber} onRowClick={onSelect} selection={selection}/>;
+    return <Table columns={columns} rows={assets} rowKey={(a) => a.assetNumber} onRowClick={onSelect} selection={selection} paginate={false}/>;
 }
 
 // ======================================================
@@ -46,3 +46,6 @@ export function AssetTable({ assets, onSelect, selection }) {
 // END: Component Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : AssetTable.jsx
+// ======================================================

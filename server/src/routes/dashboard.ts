@@ -5,6 +5,8 @@
 
 import { Router } from 'express';
 import { computeDashboardSummary, computeMonthlyDepreciationForYear, recentActivity } from '../data/activity.js';
+import { resolveBook } from '../data/books.js';
+import { primeBookRules } from '../services/book-view.js';
 
 
 // ======================================================
@@ -20,8 +22,15 @@ export const dashboardRouter = Router();
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-dashboardRouter.get('/summary', (_req, res) => {
-  res.json(computeDashboardSummary());
+dashboardRouter.get('/summary', async (req, res) => {
+  try {
+    const book = resolveBook(req.query.book);
+    await primeBookRules();
+    res.json(computeDashboardSummary(book));
+  } catch (err) {
+    console.error('[dashboard summary] failed:', err);
+    res.status(500).json({ error: 'Failed to compute dashboard summary' });
+  }
 });
 
 dashboardRouter.get('/activity', (_req, res) => {
@@ -40,12 +49,14 @@ dashboardRouter.get('/activity', (_req, res) => {
 // Output   : res (HTTP response, JSON: { year, months })
 // ======================================================
 
-dashboardRouter.get('/monthly-depreciation', (req, res) => {
+dashboardRouter.get('/monthly-depreciation', async (req, res) => {
   try {
+    const book = resolveBook(req.query.book);
+    await primeBookRules();
     const currentYear = new Date().getFullYear();
     const parsed = Number(req.query.fy);
     const year = Number.isInteger(parsed) && parsed > 1900 && parsed < 2200 ? parsed : currentYear;
-    res.json({ year, months: computeMonthlyDepreciationForYear(year) });
+    res.json({ book, year, months: computeMonthlyDepreciationForYear(year, book) });
   } catch (err) {
     // Without this, a thrown error here becomes an unhandled rejection —
     // the request never resolves, and the client's fetch just hangs, which
@@ -67,3 +78,6 @@ dashboardRouter.get('/monthly-depreciation', (req, res) => {
 // END: Route Handlers
 // ======================================================
 
+// ======================================================
+// END OF FILE : dashboard.ts
+// ======================================================

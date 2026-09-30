@@ -98,7 +98,7 @@ var RATE_TABLES = (function() {
   // Rates rounded to 2 decimal places to match IRS Publication 946 / BNA table precision
   // ======================================================
   // Function : adsRate
-  // Purpose  : Implements logic for 'adsRate'
+  // Purpose  : Returns the ADS straight-line rate % for a year (half-year in the first and last year), rounded to 2 decimals.
   // ======================================================
 
   function adsRate(lifeYears, year) {
@@ -115,7 +115,7 @@ var RATE_TABLES = (function() {
   // ── Straight-Line, Half-Year Convention ────────────────────
   // ======================================================
   // Function : slHalfYearRate
-  // Purpose  : Implements logic for 'slHalfYearRate'
+  // Purpose  : Returns the straight-line half-year convention rate % for a year.
   // ======================================================
 
   function slHalfYearRate(lifeYears, year) {
@@ -158,7 +158,7 @@ var RATE_TABLES = (function() {
   // Full month of depreciation in the month placed in service
   // ======================================================
   // Function : slFullMonthRate
-  // Purpose  : Implements logic for 'slFullMonthRate'
+  // Purpose  : Returns the straight-line rate % for a number of full months in a year.
   // ======================================================
 
   function slFullMonthRate(lifeMonths, monthsInYear) {
@@ -172,7 +172,7 @@ var RATE_TABLES = (function() {
   // Full-Month convention: Year 1 gets full months from PIS month through Dec
   // ======================================================
   // Function : fullMonthYear1Rate
-  // Purpose  : Implements logic for 'fullMonthYear1Rate'
+  // Purpose  : Returns the Year 1 rate % under the Full-Month convention (full months from the placed-in-service month to December).
   // ======================================================
 
   function fullMonthYear1Rate(lifeYears, monthPIS) {
@@ -195,7 +195,7 @@ var RATE_TABLES = (function() {
   // based on method, life, convention, and placement details.
   // ======================================================
   // Function : lookupRate
-  // Purpose  : Implements logic for 'lookupRate'
+  // Purpose  : Returns the annual depreciation % for a year based on method, life, convention and placed-in-service details.
   // ======================================================
 
   function lookupRate(params) {
@@ -466,3 +466,6 @@ module.exports = RATE_TABLES;
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : rate-tables.cjs
+// ======================================================

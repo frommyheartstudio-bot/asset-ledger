@@ -21,7 +21,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
 // ── Step 1: Validate Inputs ──────────────────────────────────
 // ======================================================
 // Function : validateTransferInput
-// Purpose  : Implements logic for 'validateTransferInput'
+// Purpose  : Step 1: checks the required Transfer inputs (total cost > 0, cost transferred, dates) and returns the errors.
 // ======================================================
 
 function validateTransferInput(input) {
@@ -63,7 +63,7 @@ function validateTransferInput(input) {
 // ── Step 2: Determine Transfer Type ──────────────────────────
 // ======================================================
 // Function : determineTransferType
-// Purpose  : Implements logic for 'determineTransferType'
+// Purpose  : Step 2: classifies the Transfer as full or partial and computes the transfer ratio.
 // ======================================================
 
 function determineTransferType(input) {
@@ -87,7 +87,7 @@ function determineTransferType(input) {
 // ── Step 3: Determine Transfer Scope ─────────────────────────
 // ======================================================
 // Function : determineTransferScope
-// Purpose  : Implements logic for 'determineTransferScope'
+// Purpose  : Step 3: classifies the Transfer as inter-company or intra-company.
 // ======================================================
 
 function determineTransferScope(input) {
@@ -111,7 +111,7 @@ function determineTransferScope(input) {
 // ── Step 4: Determine Timing ─────────────────────────────────
 // ======================================================
 // Function : determineTransferTiming
-// Purpose  : Implements logic for 'determineTransferTiming'
+// Purpose  : Step 4: decides whether the Transfer is current-period or backdated.
 // ======================================================
 
 function determineTransferTiming(input) {
@@ -337,7 +337,7 @@ function calculateTransferRevision(input, transferType, adAllocation, sourceImpa
 // ── Step 9: Build DDV Output ─────────────────────────────────
 // ======================================================
 // Function : buildTransferDDV
-// Purpose  : Implements logic for 'buildTransferDDV'
+// Purpose  : Builds the Depreciation Detail View for both the source and the destination asset.
 // ======================================================
 
 function buildTransferDDV(input, transferType, scope, adAllocation, sourceImpact, destImpact, revisionResult, timingResult) {
@@ -380,7 +380,7 @@ function buildTransferDDV(input, transferType, scope, adAllocation, sourceImpact
 // ── Step 10: Post-Processing Validation ──────────────────────
 // ======================================================
 // Function : validateTransferPostProcessing
-// Purpose  : Implements logic for 'validateTransferPostProcessing'
+// Purpose  : Runs the post-processing checks (source + destination cost = original cost, A/D split) within a tolerance of 0.02.
 // ======================================================
 
 function validateTransferPostProcessing(input, transferType, adAllocation, ddv) {
@@ -507,7 +507,7 @@ function calculateTransfer(input) {
 // ── Flowchart Definition Builder ─────────────────────────────
 // ======================================================
 // Function : buildTransferFlowchartDefinition
-// Purpose  : Implements logic for 'buildTransferFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildTransferFlowchartDefinition(activePath, result) {
@@ -682,3 +682,6 @@ module.exports = { calculateTransfer: calculateTransfer };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : transfers.cjs
+// ======================================================

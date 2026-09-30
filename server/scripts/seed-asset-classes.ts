@@ -11,6 +11,15 @@ import { pool } from '../src/db/postgres.js';
 import { loadAssetClasses, seedAssetClassesIfEmpty } from '../src/db/repo.js';
 import { ASSET_CLASS_SEED } from '../src/data/assetClasses.js';
 
+// ======================================================
+// START: Script Functions
+// ======================================================
+
+// ======================================================
+// Function : main
+// Purpose  : Seeds the asset_classes table from ASSET_CLASS_SEED (only when it is empty) and prints the result.
+// ======================================================
+
 async function main(): Promise<void> {
   const inserted = await seedAssetClassesIfEmpty(ASSET_CLASS_SEED);
   const rows = await loadAssetClasses();
@@ -23,3 +32,11 @@ main().catch((err) => {
   console.error('[seed] failed:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
+
+// ======================================================
+// END: Script Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : seed-asset-classes.ts
+// ======================================================

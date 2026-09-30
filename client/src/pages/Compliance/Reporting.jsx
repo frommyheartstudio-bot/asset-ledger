@@ -19,6 +19,8 @@ import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { formatDate } from '../../utils/formatDate';
 import { companyName } from '../../data/companies';
 import { downloadCsv } from '../../utils/csv';
+import { DEFAULT_BOOK, FALLBACK_BOOK_NAMES } from '../../data/books';
+import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 
 // ======================================================
 // START: Page Component
@@ -36,11 +38,10 @@ const ICON = {
 };
 const STATUS_TONE = { Ready: 'green', Draft: 'amber', Processing: 'blue' };
 
-// Book only ever has real data for "Federal Tax" in this prototype (same
-// as the Book selector on Planning -> Forecasting/Modeling) — offered
-// here for consistency/labeling on the generated report, not as a real
-// data split.
-const BOOK_OPTIONS = ['Federal Tax', 'GAAP', 'State No Bonus'];
+// Every maintained book (same list every Book dropdown in the app uses).
+// A generated report contains the rows of EACH book ticked here, each
+// row tagged with its Book — figures come from that book's own rules.
+const BOOK_OPTIONS = FALLBACK_BOOK_NAMES;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FREQUENCY_OPTIONS = ['Daily', 'Monthly', 'Quarterly', 'Half-Yearly'];
 // Focus Period's Year select. The past end is a fixed anchor year (30
@@ -54,6 +55,7 @@ const MIN_YEAR = 1996; // = 2026 - 30, fixed at build time
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 30 - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i);
 
 const CSV_COLUMNS = [
+    { header: 'Book', get: (a) => a.book ?? DEFAULT_BOOK },
     { header: 'Asset Number', get: (a) => a.assetNumber },
     { header: 'Description', get: (a) => a.description },
     { header: 'Asset Class', get: (a) => a.assetClass },
@@ -114,17 +116,27 @@ function buildCsvText(rows) {
 
 // ======================================================
 // Function : filterAssets
-// Purpose  : Narrows the loaded asset list to the chosen companies and
-//            asset types — Book and (for the Scheduled card) Frequency
-//            don't slice the mock asset data (same prototype limitation
-//            noted on the Book selector elsewhere in the app), so they
-//            only label the generated report, not filter its rows.
+// Purpose  : Narrows an asset list to the chosen companies and asset
+//            types (Frequency on the Scheduled card only labels the run).
 // ======================================================
 
 function filterAssets(allAssets, companies, assetTypes) {
     const companySet = new Set(companies);
     const assetTypeSet = new Set(assetTypes);
     return allAssets.filter((a) => companySet.has(a.company) && assetTypeSet.has(a.assetClass));
+}
+
+// ======================================================
+// Function : collectBookRows
+// Purpose  : The rows of a report: for every ticked book, that book's
+//            view of the assets (its own accumulated depreciation, NBV
+//            and method) narrowed to the chosen companies / asset types.
+//            Books are fetched in parallel; each row carries its `book`.
+// ======================================================
+
+async function collectBookRows(books, companies, assetTypes) {
+    const perBook = await Promise.all(books.map((b) => assetsApi.list({ book: b })));
+    return perBook.flatMap((res, i) => filterAssets((res.items ?? []).map((a) => ({ ...a, book: a.book ?? books[i] })), companies, assetTypes));
 }
 
 // ======================================================
@@ -149,26 +161,6 @@ function toIsoDate(d) {
 // ======================================================
 
 // ======================================================
-// Function : useAutoSelectAll
-// Purpose  : Defaults a MultiSelect to "everything selected" once its
-//            option list is actually known (it's empty on first render,
-//            before the asset list has loaded) — shared by the Custom
-//            Report and Scheduled Report cards' Company/Asset Type
-//            selects.
-// ======================================================
-
-function useAutoSelectAll(options, selected, setSelected) {
-    useEffect(() => {
-        if (options.length && selected.length === 0) setSelected(options.map((o) => o.value));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options]);
-}
-
-// ======================================================
-// END: useAutoSelectAll
-// ======================================================
-
-// ======================================================
 // Function : NewReportCard
 // Purpose  : "+ Custom Report" modal — report name, focus period (start/
 //            end month), and Book/Company/Asset Type multi-selects (each
@@ -184,7 +176,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
     const [periodStart, setPeriodStart] = useState('Jan');
     const [periodEnd, setPeriodEnd] = useState('Dec');
     const [periodYear, setPeriodYear] = useState(CURRENT_YEAR);
-    const [books, setBooks] = useState(BOOK_OPTIONS);
+    const [books, setBooks] = useState([DEFAULT_BOOK]);
     const [companies, setCompanies] = useState([]);
     const [assetTypes, setAssetTypes] = useState([]);
     const [error, setError] = useState(null);
@@ -216,7 +208,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
         setPeriodStart('Jan');
         setPeriodEnd('Dec');
         setPeriodYear(CURRENT_YEAR);
-        setBooks(BOOK_OPTIONS);
+        setBooks([DEFAULT_BOOK]);
         setCompanies(companyOptions.map((o) => o.value));
         setAssetTypes(assetTypeOptions.map((o) => o.value));
         setError(null);
@@ -246,16 +238,14 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
             return;
         }
 
-        const rows = filterAssets(allAssets, companies, assetTypes);
-
         const period = periodStart === periodEnd ? `${periodStart} ${periodYear}` : `${periodStart}–${periodEnd} ${periodYear}`;
         const bookLabel = books.length === BOOK_OPTIONS.length ? 'All Books' : books.join(', ');
 
-        const csvText = buildCsvText(rows);
-        downloadCsv(`${slugify(name)}.csv`, csvText);
-
         setGenerating(true);
         try {
+            const rows = await collectBookRows(books, companies, assetTypes);
+            const csvText = buildCsvText(rows);
+            downloadCsv(`${slugify(name)}.csv`, csvText);
             const created = await reportsApi.generateReport({
                 name: name.trim(),
                 book: bookLabel,
@@ -321,7 +311,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
 function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
     const { user } = useAuth();
     const [frequency, setFrequency] = useState('Monthly');
-    const [books, setBooks] = useState(BOOK_OPTIONS);
+    const [books, setBooks] = useState([DEFAULT_BOOK]);
     const [companies, setCompanies] = useState([]);
     const [assetTypes, setAssetTypes] = useState([]);
     const [error, setError] = useState(null);
@@ -352,7 +342,7 @@ function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
 
     function reset() {
         setFrequency('Monthly');
-        setBooks(BOOK_OPTIONS);
+        setBooks([DEFAULT_BOOK]);
         setCompanies(companyOptions.map((o) => o.value));
         setAssetTypes(assetTypeOptions.map((o) => o.value));
         setError(null);
@@ -382,16 +372,15 @@ function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
             return;
         }
 
-        const rows = filterAssets(allAssets, companies, assetTypes);
         const bookLabel = books.length === BOOK_OPTIONS.length ? 'All Books' : books.join(', ');
         const period = `${formatDate(startIso)} – ${formatDate(endIso)}`;
         const name = `Scheduled — ${frequency}`;
 
-        const csvText = buildCsvText(rows);
-        downloadCsv(`${slugify(name)}-${startIso}-to-${endIso}.csv`, csvText);
-
         setGenerating(true);
         try {
+            const rows = await collectBookRows(books, companies, assetTypes);
+            const csvText = buildCsvText(rows);
+            downloadCsv(`${slugify(name)}-${startIso}-to-${endIso}.csv`, csvText);
             const created = await reportsApi.generateReport({
                 name: `${name} (${period})`,
                 book: bookLabel,
@@ -475,7 +464,11 @@ export function Reporting() {
         downloadCsv(`${slugify(row.name)}.csv`, text);
     }
 
-    const visibleRecent = bookFilter === 'All Books' ? recent : recent.filter((r) => r.book === bookFilter);
+    // A report matches a book when it was generated for that book, for a list
+    // of books that includes it, or for "All Books".
+    const visibleRecent = bookFilter === 'All Books'
+        ? recent
+        : recent.filter((r) => r.book === 'All Books' || String(r.book ?? '').split(', ').includes(bookFilter));
 
     const columns = [
         { header: 'Report', render: (r) => r.name },
@@ -527,9 +520,7 @@ export function Reporting() {
           <h3>Recently Generated Reports</h3>
           <select className="btn btn-ghost btn-sm" value={bookFilter} onChange={(e) => setBookFilter(e.target.value)}>
             <option>All Books</option>
-            <option>Federal Tax</option>
-            <option>GAAP</option>
-            <option>State No Bonus</option>
+            {BOOK_OPTIONS.map((b) => (<option key={b}>{b}</option>))}
           </select>
         </div>
         {visibleRecent.length === 0 ? (<EmptyState title="No reports generated yet" description="Reports you generate will show up here."/>) : (<Table columns={columns} rows={visibleRecent} rowKey={(r) => `${r.name}-${r.date}`}/>)}
@@ -546,4 +537,8 @@ export function Reporting() {
 
 // ======================================================
 // END: Page Component
+// ======================================================
+
+// ======================================================
+// END OF FILE : Reporting.jsx
 // ======================================================

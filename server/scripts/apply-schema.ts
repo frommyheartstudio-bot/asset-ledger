@@ -15,9 +15,18 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { pool } from '../src/db/postgres.js';
 
+// ======================================================
+// START: Script Functions
+// ======================================================
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const files = ['schema.sql', 'schema-core.sql', 'schema-transactions.sql'];
+
+// ======================================================
+// Function : splitStatements
+// Purpose  : Strips "--" comment lines from a SQL file and splits it into individual statements on ";".
+// ======================================================
 
 function splitStatements(sql: string): string[] {
   return sql
@@ -30,6 +39,11 @@ function splitStatements(sql: string): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
+
+// ======================================================
+// Function : main
+// Purpose  : Runs every schema file in order against Postgres and reports progress.
+// ======================================================
 
 async function main(): Promise<void> {
   for (const file of files) {
@@ -58,3 +72,11 @@ main().catch((err) => {
   console.error('\n[apply-schema] Error:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
+
+// ======================================================
+// END: Script Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : apply-schema.ts
+// ======================================================

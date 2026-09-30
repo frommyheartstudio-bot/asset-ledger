@@ -9,6 +9,10 @@
 //             becoming its sortOrder column in the DB.
 // ======================================================
 
+// ======================================================
+// START: Seed Data
+// ======================================================
+
 export interface AssetClassSeedRow {
   name: string;
   propertyType: string;
@@ -151,3 +155,11 @@ export const ASSET_CLASS_SEED: AssetClassSeedRow[] = [
   { name: "US-Software No Bonus", propertyType: "PP - Personal Property", method: "SL - Straight Line", ratePct: "100", convention: "FM - Full-Month", life: "3 years 0 months" },
   { name: "Utility Owned Substation", propertyType: "PP - Personal Property", method: "SL - Straight Line", ratePct: "100", convention: "FM - Full-Month", life: "10 years 0 months" },
 ];
+
+// ======================================================
+// END: Seed Data
+// ======================================================
+
+// ======================================================
+// END OF FILE : assetClasses.ts
+// ======================================================

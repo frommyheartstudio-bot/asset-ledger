@@ -6,12 +6,20 @@
 //             UPPER, one lower, one number, one symbol.
 // ======================================================
 
+// ======================================================
+// START: Utility Functions
+// ======================================================
+
 const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O — avoids look-alikes
 const LOWER = 'abcdefghijkmnpqrstuvwxyz';
 const DIGITS = '23456789';
 const SYMBOLS = '!@#$%^&*?-';
 const ALL = UPPER + LOWER + DIGITS + SYMBOLS;
 
+// ======================================================
+// Function : pick
+// Purpose  : Returns one random character from the given string.
+// ======================================================
 function pick(chars) {
     return chars[Math.floor(Math.random() * chars.length)];
 }
@@ -60,6 +68,18 @@ export function passwordStrengthIssues(password) {
 // END: passwordStrengthIssues
 // ======================================================
 
+// ======================================================
+// Function : isStrongPassword
+// Purpose  : True when the password passes every strength rule.
+// ======================================================
 export function isStrongPassword(password) {
     return passwordStrengthIssues(password).length === 0;
 }
+
+// ======================================================
+// END: Utility Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : password.js
+// ======================================================

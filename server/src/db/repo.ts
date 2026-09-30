@@ -18,7 +18,12 @@
 // ======================================================
 
 import { pool } from './postgres.js';
+import type { AssetClassSeedRow } from '../data/assetClasses.js';
 import type { Asset, DepreciationScheduleRow, TimelineEntry } from '../types.js';
+
+// ======================================================
+// START: Repository Functions
+// ======================================================
 
 export interface CoreSnapshot {
   assets: Asset[];
@@ -40,10 +45,20 @@ async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
 // END: query
 // ======================================================
 
+// ======================================================
+// Function : n
+// Purpose  : Converts a value to a finite number (0 when it is not numeric).
+// ======================================================
+
 function n(v: unknown): number {
   const x = Number(v);
   return Number.isFinite(x) ? x : 0;
 }
+
+// ======================================================
+// Function : dateOnly
+// Purpose  : Formats a Postgres DATE value as a plain YYYY-MM-DD string.
+// ======================================================
 
 // Postgres DATE columns come back from `pg` as JS Date objects (local
 // midnight). String(date) gives "Sun Mar 15 2026 00:00:00 GMT+0530 …",
@@ -56,6 +71,11 @@ function dateOnly(v: unknown): string {
   }
   return String(v ?? '');
 }
+
+// ======================================================
+// Function : orUndef
+// Purpose  : Returns undefined for null / empty values, otherwise the value as a string.
+// ======================================================
 
 function orUndef(v: unknown): string | undefined {
   return v === null || v === undefined || v === '' ? undefined : String(v);
@@ -317,6 +337,11 @@ let inFlight: Promise<void> | null = null;
 let pending = false;
 let snapshotSource: (() => CoreSnapshot) | null = null;
 
+// ======================================================
+// Function : registerSnapshotSource
+// Purpose  : Registers the function that supplies the current in-memory snapshot to be flushed to Postgres.
+// ======================================================
+
 export function registerSnapshotSource(fn: () => CoreSnapshot): void {
   snapshotSource = fn;
 }
@@ -374,16 +399,7 @@ export async function loadAdmin() {
     query<Record<string, unknown>>(`SELECT * FROM generated_reports ORDER BY "reportDate" DESC, name`)
   ]);
 
-  const mappedUsers = users.map((u) => ({
-    id: String(u.id),
-    name: String(u.name ?? ''),
-    email: String(u.email ?? ''),
-    role: String(u.role ?? ''),
-    lastActive: String(u.lastActive ?? ''),
-    status: String(u.status ?? ''),
-    menuAccess: safeJson(u.menuAccess)
-    // password intentionally omitted — write-only, never sent to the client
-  }));
+  const mappedUsers = users.map(toUserView);
 
   return {
     // userCount is derived from the real users table below rather than a
@@ -416,6 +432,29 @@ export async function loadAdmin() {
     }))
   };
 }
+
+// ======================================================
+// Function : toUserView
+// Purpose  : Maps a raw users row to the shape sent to the client. The
+//            password is intentionally omitted (write-only, never sent).
+// ======================================================
+
+function toUserView(u: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: String(u.id),
+    name: String(u.name ?? ''),
+    email: String(u.email ?? ''),
+    role: String(u.role ?? ''),
+    lastActive: String(u.lastActive ?? ''),
+    status: String(u.status ?? ''),
+    menuAccess: safeJson(u.menuAccess)
+  };
+}
+
+// ======================================================
+// Function : safeJson
+// Purpose  : Parses a JSON string into a menuAccess object; returns {} when it is malformed.
+// ======================================================
 
 function safeJson(raw: unknown): Record<string, boolean> {
   try {
@@ -511,18 +550,16 @@ export async function seedAdminIfEmpty(seed: {
 //            on, same as the asset book itself.
 // ======================================================
 
-export interface AssetClassRow {
-  name: string;
-  propertyType: string;
-  method: string;
-  ratePct: string;
-  convention: string;
-  life: string;
-}
+export type AssetClassRow = AssetClassSeedRow;
 
 // Creates the table on first use, so the page works even if nobody ran
 // `npm run db:schema:apply` yet (same DDL as db/schema.sql). Runs once.
 let assetClassesTableReady: Promise<void> | null = null;
+// ======================================================
+// Function : ensureAssetClassesTable
+// Purpose  : Creates the asset_classes table on first use (runs once).
+// ======================================================
+
 function ensureAssetClassesTable(): Promise<void> {
   if (!assetClassesTableReady) {
     assetClassesTableReady = pool.query(
@@ -540,6 +577,11 @@ function ensureAssetClassesTable(): Promise<void> {
   return assetClassesTableReady;
 }
 
+// ======================================================
+// Function : loadAssetClasses
+// Purpose  : Reads every asset class row from Postgres in sort order.
+// ======================================================
+
 export async function loadAssetClasses(): Promise<AssetClassRow[]> {
   await ensureAssetClassesTable();
   const rows = await query<Record<string, unknown>>(
@@ -554,6 +596,11 @@ export async function loadAssetClasses(): Promise<AssetClassRow[]> {
     life: String(r.life ?? '')
   }));
 }
+
+// ======================================================
+// Function : seedAssetClassesIfEmpty
+// Purpose  : Inserts the seed rows only when the asset_classes table is empty; returns whether it inserted.
+// ======================================================
 
 export async function seedAssetClassesIfEmpty(seed: AssetClassRow[]): Promise<boolean> {
   await ensureAssetClassesTable();
@@ -584,6 +631,155 @@ export async function seedAssetClassesIfEmpty(seed: AssetClassRow[]): Promise<bo
 
 // ======================================================
 // END: loadAssetClasses / seedAssetClassesIfEmpty
+// ======================================================
+
+// ======================================================
+// Function : Custom asset classes (Configuration -> Asset Classes ->
+//            "Customize Table")
+// Purpose  : 3 rows, same 6 columns as the default table (Name, Property
+//            Type, Method, Rate %, Convention, Life). The Name is the Book
+//            followed by the asset type, e.g. "GAAP - Acquisition"; the
+//            two parts are stored separately so each can be edited.
+//            Seeded once, when the table is empty. The default
+//            asset_classes table is never touched.
+// ======================================================
+
+export interface CustomAssetClassRow extends AssetClassRow {
+  id: number;
+  book: string;
+  assetType: string;
+}
+
+const CUSTOM_ASSET_CLASS_SEED: Array<Omit<CustomAssetClassRow, 'id' | 'name'>> = [
+  { book: 'GAAP', assetType: 'Acquisition', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '0 years 0 months' },
+  { book: 'GAAP', assetType: 'Alternative Energy Property', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '10 years 0 months' },
+  { book: 'GAAP', assetType: 'Alternative Energy Property - ADS', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '10 years 0 months' }
+];
+
+let customRowsTableReady: Promise<void> | null = null;
+// ======================================================
+// Function : ensureCustomRowsTable
+// Purpose  : Creates the asset_class_custom_table on first use (runs once).
+// ======================================================
+
+function ensureCustomRowsTable(): Promise<void> {
+  if (!customRowsTableReady) {
+    customRowsTableReady = pool.query(
+      `CREATE TABLE IF NOT EXISTS asset_class_custom_table (
+         id              SERIAL PRIMARY KEY,
+         book            TEXT NOT NULL,
+         "assetType"     TEXT NOT NULL,
+         "propertyType"  TEXT NOT NULL,
+         method          TEXT NOT NULL,
+         "ratePct"       TEXT NOT NULL,
+         convention      TEXT NOT NULL,
+         life            TEXT NOT NULL
+       )`
+    ).then(() => undefined).catch((err) => { customRowsTableReady = null; throw err; });
+  }
+  return customRowsTableReady;
+}
+
+// ======================================================
+// Function : toCustomRow
+// Purpose  : Maps a raw custom-table row to a CustomAssetClassRow (builds the Name from Book + asset type).
+// ======================================================
+
+function toCustomRow(r: Record<string, unknown>): CustomAssetClassRow {
+  const book = String(r.book ?? '');
+  const assetType = String(r.assetType ?? '');
+  return {
+    id: Number(r.id),
+    book,
+    assetType,
+    name: `${book} - ${assetType}`,
+    propertyType: String(r.propertyType ?? ''),
+    method: String(r.method ?? ''),
+    ratePct: String(r.ratePct ?? ''),
+    convention: String(r.convention ?? ''),
+    life: String(r.life ?? '')
+  };
+}
+
+// ======================================================
+// Function : loadCustomAssetClasses
+// Purpose  : Reads the custom asset class rows, seeding the default rows on first use.
+// ======================================================
+
+export async function loadCustomAssetClasses(): Promise<CustomAssetClassRow[]> {
+  await ensureCustomRowsTable();
+  // The 3 starter rows are inserted ONCE. A marker row records that, so a
+  // person who deletes every rule doesn't get the starter rows back on the
+  // next read (rules can now be added and deleted, not just edited).
+  await pool.query(`CREATE TABLE IF NOT EXISTS asset_class_custom_seeded (done BOOLEAN NOT NULL)`);
+  const [{ c }] = await query<{ c: string }>(`SELECT count(*) AS c FROM asset_class_custom_table`);
+  const [{ m }] = await query<{ m: string }>(`SELECT count(*) AS m FROM asset_class_custom_seeded`);
+  if (Number(m) === 0) {
+    if (Number(c) === 0) {
+      for (const r of CUSTOM_ASSET_CLASS_SEED) {
+        await pool.query(
+          `INSERT INTO asset_class_custom_table (book, "assetType", "propertyType", method, "ratePct", convention, life)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [r.book, r.assetType, r.propertyType, r.method, r.ratePct, r.convention, r.life]
+        );
+      }
+    }
+    await pool.query(`INSERT INTO asset_class_custom_seeded (done) VALUES (true)`);
+  }
+  const rows = await query<Record<string, unknown>>(`SELECT * FROM asset_class_custom_table ORDER BY id ASC`);
+  return rows.map(toCustomRow);
+}
+
+// ======================================================
+// Function : updateCustomAssetClass
+// Purpose  : Updates one custom asset class row and returns the saved row (null when not found).
+// ======================================================
+
+export async function updateCustomAssetClass(id: number, f: Omit<CustomAssetClassRow, 'id' | 'name'>): Promise<CustomAssetClassRow | null> {
+  await ensureCustomRowsTable();
+  const rows = await query<Record<string, unknown>>(
+    `UPDATE asset_class_custom_table
+        SET book=$2, "assetType"=$3, "propertyType"=$4, method=$5,
+            "ratePct"=$6, convention=$7, life=$8
+      WHERE id=$1
+      RETURNING *`,
+    [id, f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life]
+  );
+  return rows.length ? toCustomRow(rows[0]) : null;
+}
+
+// ======================================================
+// Function : createCustomAssetClass
+// Purpose  : Adds one custom asset class row (a depreciation rule for one
+//            Book + asset type) and returns it. A book has no rule for an
+//            asset class until a row like this exists — until then it just
+//            mirrors Federal Tax (services/book-view.ts).
+// ======================================================
+
+export async function createCustomAssetClass(f: Omit<CustomAssetClassRow, 'id' | 'name'>): Promise<CustomAssetClassRow> {
+  await ensureCustomRowsTable();
+  const rows = await query<Record<string, unknown>>(
+    `INSERT INTO asset_class_custom_table (book, "assetType", "propertyType", method, "ratePct", convention, life)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     RETURNING *`,
+    [f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life]
+  );
+  return toCustomRow(rows[0]);
+}
+
+// ======================================================
+// Function : deleteCustomAssetClass
+// Purpose  : Deletes one custom asset class row; false when it doesn't exist.
+// ======================================================
+
+export async function deleteCustomAssetClass(id: number): Promise<boolean> {
+  await ensureCustomRowsTable();
+  const rows = await query<Record<string, unknown>>(`DELETE FROM asset_class_custom_table WHERE id=$1 RETURNING id`, [id]);
+  return rows.length > 0;
+}
+
+// ======================================================
+// END: Custom asset classes
 // ======================================================
 
 // ======================================================
@@ -684,15 +880,7 @@ export async function updateUser(id: string, patch: {
     [updated.id, updated.name, updated.email, updated.role, updated.status, updated.password, updated.menuAccess]
   );
 
-  return {
-    id: updated.id,
-    name: updated.name,
-    email: updated.email,
-    role: updated.role,
-    lastActive: updated.lastActive,
-    status: updated.status,
-    menuAccess: safeJson(updated.menuAccess)
-  };
+  return toUserView(updated);
 }
 
 // ======================================================
@@ -796,15 +984,7 @@ export async function verifyLogin(email: string, password: string): Promise<Reco
 
   await pool.query(`UPDATE users SET "lastActive" = $2, status = $3 WHERE id = $1`, [updated.id, updated.lastActive, updated.status]);
 
-  return {
-    id: updated.id,
-    name: updated.name,
-    email: updated.email,
-    role: updated.role,
-    lastActive: updated.lastActive,
-    status: updated.status,
-    menuAccess: safeJson(updated.menuAccess)
-  };
+  return toUserView(updated);
 }
 
 // ======================================================
@@ -846,6 +1026,11 @@ export interface NotificationRow {
 }
 
 let notificationsTableReady: Promise<unknown> | null = null;
+// ======================================================
+// Function : ensureNotificationsTable
+// Purpose  : Creates the notifications table on first use (runs once; retries if creation failed).
+// ======================================================
+
 function ensureNotificationsTable(): Promise<unknown> {
   if (!notificationsTableReady) {
     notificationsTableReady = pool.query(
@@ -863,6 +1048,11 @@ function ensureNotificationsTable(): Promise<unknown> {
   return notificationsTableReady;
 }
 
+// ======================================================
+// Function : addNotification
+// Purpose  : Saves one sign-in / registration notification to Postgres.
+// ======================================================
+
 export async function addNotification(n: Omit<NotificationRow, 'seq'>): Promise<void> {
   await ensureNotificationsTable();
   await pool.query(
@@ -870,6 +1060,11 @@ export async function addNotification(n: Omit<NotificationRow, 'seq'>): Promise<
     [n.id, n.name, n.email, n.role, n.at, n.type]
   );
 }
+
+// ======================================================
+// Function : listNotifications
+// Purpose  : Reads every notification, newest first.
+// ======================================================
 
 export async function listNotifications(): Promise<NotificationRow[]> {
   await ensureNotificationsTable();
@@ -885,8 +1080,21 @@ export async function listNotifications(): Promise<NotificationRow[]> {
   }));
 }
 
+// ======================================================
+// Function : deleteNotification
+// Purpose  : Deletes one notification by seq; returns true when a row was removed.
+// ======================================================
+
 export async function deleteNotification(seq: number): Promise<boolean> {
   await ensureNotificationsTable();
   const result = await pool.query(`DELETE FROM notifications WHERE seq = $1`, [seq]);
   return (result.rowCount ?? 0) > 0;
 }
+
+// ======================================================
+// END: Repository Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : repo.ts
+// ======================================================

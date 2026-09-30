@@ -21,7 +21,7 @@ const RATE_TABLES = require("./rate-tables.cjs");
 // ── Step 1: Validate Inputs ──────────────────────────────────
 // ======================================================
 // Function : validateAdjustmentInput
-// Purpose  : Implements logic for 'validateAdjustmentInput'
+// Purpose  : Step 1: checks the required Adjustment inputs (non-zero amount, dates, cost) and returns the errors.
 // ======================================================
 
 function validateAdjustmentInput(input) {
@@ -66,7 +66,7 @@ function validateAdjustmentInput(input) {
 // ── Step 2: Determine Adjustment Type ────────────────────────
 // ======================================================
 // Function : determineAdjustmentType
-// Purpose  : Implements logic for 'determineAdjustmentType'
+// Purpose  : Step 2: classifies the Adjustment as positive or negative and computes the adjusted cost.
 // ======================================================
 
 function determineAdjustmentType(input) {
@@ -88,7 +88,7 @@ function determineAdjustmentType(input) {
 // ── Step 3: Determine Timing ─────────────────────────────────
 // ======================================================
 // Function : determineAdjustmentTiming
-// Purpose  : Implements logic for 'determineAdjustmentTiming'
+// Purpose  : Step 3: decides whether the Adjustment is current-period or backdated.
 // ======================================================
 
 function determineAdjustmentTiming(input) {
@@ -317,7 +317,7 @@ function calculateAdjustmentRevision(input, adjType, bonusResult, regularResult,
 // ── Step 7: Build DDV Output ─────────────────────────────────
 // ======================================================
 // Function : buildAdjustmentDDV
-// Purpose  : Implements logic for 'buildAdjustmentDDV'
+// Purpose  : Builds the Depreciation Detail View for the Adjustment (adjusted cost, adjustment balance, depreciation).
 // ======================================================
 
 function buildAdjustmentDDV(input, adjType, bonusResult, regularResult, revisionResult, timingResult) {
@@ -405,7 +405,7 @@ function buildAdjustmentDDV(input, adjType, bonusResult, regularResult, revision
 // ── Step 8: Post-Processing Validation ───────────────────────
 // ======================================================
 // Function : validateAdjustmentPostProcessing
-// Purpose  : Implements logic for 'validateAdjustmentPostProcessing'
+// Purpose  : Runs the post-processing checks (cost = original + adjustment, NBV balance) on the DDV.
 // ======================================================
 
 function validateAdjustmentPostProcessing(input, adjType, ddv) {
@@ -589,7 +589,7 @@ function calculateAdjustment(input) {
 // ── Flowchart Definition Builder ─────────────────────────────
 // ======================================================
 // Function : buildAdjustmentFlowchartDefinition
-// Purpose  : Implements logic for 'buildAdjustmentFlowchartDefinition'
+// Purpose  : Builds the Mermaid flowchart text, marking which steps ran, were skipped or errored.
 // ======================================================
 
 function buildAdjustmentFlowchartDefinition(activePath, result) {
@@ -788,3 +788,6 @@ module.exports = { calculateAdjustment: calculateAdjustment };
 // END: Calculation Engine Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : adjustments.cjs
+// ======================================================

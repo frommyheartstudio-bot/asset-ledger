@@ -1,3 +1,8 @@
+/* ====================================================== */
+/* File Name : layout.css */
+/* Purpose   : Layout shell styles: sidebar, header/topbar, main area, footer. */
+/* ====================================================== */
+
 /* Layout-specific styles: sidebar, topbar/header, main shell, footer. */
 /* Imported by AppLayout.tsx. Design tokens (colors, spacing) live in ../styles.css. */
 
@@ -197,3 +202,7 @@
 @media (max-width: 480px) {
   .topbar .icon-btn[title="Help"] { display: none; }
 }
+
+/* ====================================================== */
+/* END OF FILE : layout.css */
+/* ====================================================== */

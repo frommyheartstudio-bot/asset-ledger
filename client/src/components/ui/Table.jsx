@@ -4,6 +4,8 @@
 // ======================================================
 
 
+import { Pagination, usePagination } from './Pagination';
+
 // ======================================================
 // START: Component Functions
 // ======================================================
@@ -15,14 +17,21 @@
  *   { selectedKeys: Set<key>, allSelected: bool, someSelected: bool,
  *     onToggleRow: (key) => void, onToggleAll: () => void }
  * When omitted, the table renders exactly as before (no checkbox column).
+ *
+ * Rows are paginated (10 / 25 / 50 / 100 per page) unless `paginate={false}`
+ * is passed (the Asset Register paginates its own list). The pager hides
+ * itself when there are 10 rows or fewer.
  */
 // ======================================================
 // Function : Table
 // Purpose  : React component that renders the 'Table' UI
 // ======================================================
 
-export function Table({ columns, rows, rowKey, onRowClick, selection }) {
-    return (<div className="table-wrap">
+export function Table({ columns, rows, rowKey, onRowClick, selection, paginate = true }) {
+    const pg = usePagination(rows);
+    const shown = paginate ? pg.pageItems : rows;
+    return (<>
+    <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -37,7 +46,7 @@ export function Table({ columns, rows, rowKey, onRowClick, selection }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {shown.map((row) => {
             const key = rowKey(row);
             return (<tr key={key} onClick={onRowClick ? () => onRowClick(row) : undefined}>
               {selection && (<td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
@@ -50,7 +59,9 @@ export function Table({ columns, rows, rowKey, onRowClick, selection }) {
           })}
         </tbody>
       </table>
-    </div>);
+    </div>
+    {paginate && <Pagination {...pg.pager}/>}
+    </>);
 }
 
 // ======================================================
@@ -61,3 +72,6 @@ export function Table({ columns, rows, rowKey, onRowClick, selection }) {
 // END: Component Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : Table.jsx
+// ======================================================

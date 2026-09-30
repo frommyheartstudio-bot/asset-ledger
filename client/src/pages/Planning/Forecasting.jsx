@@ -3,34 +3,27 @@
 // Purpose   : Page-level component for Forecasting
 // ======================================================
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { reportsApi } from '../../api/reports.api';
 import { assetsApi } from '../../api/assets.api';
 import { AppLayout } from '../../layout/AppLayout';
 import { StatCard } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
+import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { MultiSelect } from '../../components/ui/MultiSelect';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { companyName } from '../../data/companies';
 import { Loader } from '../../components/common/Loader';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
+import { BookSelect } from '../../components/ui/BookSelect';
+import { DEFAULT_BOOK } from '../../data/books';
 
 // ======================================================
 // START: Page Component
 // ======================================================
 
-const BOOK_OPTIONS = ['Federal Tax', 'GAAP', 'State No Bonus'];
-
-// Defaults a checkbox MultiSelect to "everything selected" once its option
-// list is actually known (Company's is empty on first render, before the
-// asset list has loaded) — same helper as Modeling's filter bar.
-function useAutoSelectAll(options, selected, setSelected) {
-    useEffect(() => {
-        if (options.length && selected.length === 0) setSelected(options.map((o) => o.value));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options]);
-}
 
 // ======================================================
 // Function : Forecasting
@@ -49,7 +42,9 @@ export function Forecasting() {
     // doesn't change the numbers). Company and Asset Type are read from
     // the real asset list and, when narrowed, scope the forecast down to
     // that slice of the book instead of the whole portfolio.
-    const [books, setBooks] = useState(BOOK_OPTIONS);
+    // One book at a time: every table on this page shows that book's projection.
+    // Changing it re-runs the forecast straight away (no Submit needed).
+    const [book, setBook] = useState(DEFAULT_BOOK);
     const [companies, setCompanies] = useState([]);
     const assetClassNames = useAssetClasses();
     const ASSET_TYPE_OPTIONS = useMemo(() => assetClassNames.map((c) => ({ value: c, label: c })), [assetClassNames]);
@@ -95,16 +90,23 @@ export function Forecasting() {
     const [monthlyByYear, setMonthlyByYear] = useState({});
     const [monthlyLoading, setMonthlyLoading] = useState(false);
     const [monthlyError, setMonthlyError] = useState(null);
+    // Latest book, so a months request that finishes after a book switch is ignored.
+    const bookRef = useRef(book);
+    bookRef.current = book;
 
     useEffect(() => {
+        let alive = true;
         setData(null);
         reportsApi.getForecast(years, {
             company: applied.company,
-            assetType: applied.assetType
-        }).then(setData);
+            assetType: applied.assetType,
+            book
+        }).then((res) => { if (alive) setData(res); })
+            .catch((err) => console.error('Failed to load forecast:', err));
         setExpandedYear(null);
         setMonthlyByYear({});
-    }, [years, applied]);
+        return () => { alive = false; };
+    }, [years, applied, book]);
 
     function toggleYear(year) {
         if (expandedYear === year) {
@@ -115,12 +117,16 @@ export function Forecasting() {
         setMonthlyError(null);
         if (!monthlyByYear[year]) {
             setMonthlyLoading(true);
-            assetsApi.getMonthlyDepreciation(year)
-                .then((res) => setMonthlyByYear((prev) => ({ ...prev, [year]: res.months })))
-                .catch((err) => setMonthlyError(err.message || 'Failed to load monthly detail'))
+            const requestedBook = book;
+            assetsApi.getMonthlyDepreciation(year, book)
+                .then((res) => { if (bookRef.current === requestedBook) setMonthlyByYear((prev) => ({ ...prev, [year]: res.months })); })
+                .catch((err) => { if (bookRef.current === requestedBook) setMonthlyError(err.message || 'Failed to load monthly detail'); })
                 .finally(() => setMonthlyLoading(false));
         }
     }
+    const yearPg = usePagination(data?.expenseByYear ?? []);
+    const rollPg = usePagination(data?.rollForward ?? []);
+
     return (<AppLayout active="forecasting" title="Forecasting" crumb="Home / Planning / Forecasting">
       <div className="page-header">
         <div>
@@ -140,8 +146,7 @@ export function Forecasting() {
       </div>
 
       <div className="card card-pad mb-4">
-        <div className="grid grid-3">
-          <MultiSelect label="Book" options={BOOK_OPTIONS.map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks} allLabel="All Books"/>
+        <div className="grid grid-2">
           <MultiSelect label="Company" options={companyOptions} selected={companies} onChange={setCompanies} allLabel="All Companies"/>
           <MultiSelect label="Asset Type" options={ASSET_TYPE_OPTIONS} selected={assetTypes} onChange={setAssetTypes} allLabel="All Types"/>
         </div>
@@ -166,8 +171,11 @@ export function Forecasting() {
 
           <div className="card mb-4">
             <div className="card-head">
-              <h3>{years}-Year Depreciation Expense Forecast</h3>
-              <span className="text-sm text-muted">click a year for the monthly breakdown</span>
+              <h3>{years}-Year Depreciation Expense Forecast ({book})</h3>
+              <div className="card-head-controls">
+                <BookSelect value={book} onChange={setBook}/>
+                <span className="text-sm text-muted">click a year for the monthly breakdown</span>
+              </div>
             </div>
             <div className="table-wrap">
               <table className="table">
@@ -178,7 +186,7 @@ export function Forecasting() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.expenseByYear.map((e) => {
+                  {yearPg.pageItems.map((e) => {
                     const isOpen = expandedYear === e.year;
                     return (<Fragment key={e.year}>
                       <tr onClick={() => toggleYear(e.year)} style={{ cursor: 'pointer' }}>
@@ -215,11 +223,13 @@ export function Forecasting() {
                 </tbody>
               </table>
             </div>
+            <Pagination {...yearPg.pager}/>
           </div>
 
           <div className="card">
             <div className="card-head">
-              <h3>Capital Roll-Forward Projection</h3>
+              <h3>Capital Roll-Forward Projection ({book})</h3>
+              <BookSelect value={book} onChange={setBook}/>
             </div>
             <div className="table-wrap">
               <table className="table">
@@ -234,7 +244,7 @@ export function Forecasting() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rollForward.map((r) => (<tr key={r.year}>
+                  {rollPg.pageItems.map((r) => (<tr key={r.year}>
                       <td>{r.year}</td>
                       <td className="num">{formatCurrency(r.openingNbv, { compact: true })}</td>
                       <td className="num">{formatCurrency(r.additions, { compact: true })}</td>
@@ -245,6 +255,7 @@ export function Forecasting() {
                 </tbody>
               </table>
             </div>
+            <Pagination {...rollPg.pager}/>
           </div>
         </>)}
     </AppLayout>);
@@ -258,3 +269,6 @@ export function Forecasting() {
 // END: Page Component
 // ======================================================
 
+// ======================================================
+// END OF FILE : Forecasting.jsx
+// ======================================================

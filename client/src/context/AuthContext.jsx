@@ -25,6 +25,10 @@ import { MENU_ITEMS } from '../layout/nav';
 // instead of quietly showing the app as some default user.
 const STORAGE_KEY = 'al_auth_user';
 
+// ======================================================
+// Function : readStoredUser
+// Purpose  : Reads the signed-in user from sessionStorage; returns null when nothing is stored or it cannot be parsed.
+// ======================================================
 function readStoredUser() {
     try {
         const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -35,6 +39,10 @@ function readStoredUser() {
     }
 }
 
+// ======================================================
+// Function : initialsFor
+// Purpose  : Builds up to two upper-case initials from a full name (used for the avatar).
+// ======================================================
 function initialsFor(name) {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 }
@@ -201,4 +209,8 @@ export function useAuth() {
 
 // ======================================================
 // END: Context
+// ======================================================
+
+// ======================================================
+// END OF FILE : AuthContext.jsx
 // ======================================================

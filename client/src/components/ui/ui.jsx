@@ -78,6 +78,10 @@ function axisMoney(n) {
     return `$${Math.round(n)}`;
 }
 
+// ======================================================
+// Function : mixWithWhite
+// Purpose  : Mixes a base hex colour with white by weight (0 = white, 1 = full colour) for chart shading.
+// ======================================================
 // mix base hex color with white according to weight (0 = white, 1 = full base color)
 function mixWithWhite(hex, weight) {
     const h = hex.replace('#', '');
@@ -182,3 +186,6 @@ export function Donut({ segments, size = 150 }) {
 // END: Component Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : ui.jsx
+// ======================================================

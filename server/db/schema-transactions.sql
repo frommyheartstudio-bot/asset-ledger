@@ -26,3 +26,7 @@ CREATE TABLE IF NOT EXISTS asset_transactions
     posted_by                               TEXT NOT NULL DEFAULT 'system'
 );
 CREATE INDEX IF NOT EXISTS idx_asset_transactions_asset_posted ON asset_transactions (asset_number, posted_at);
+
+-- ======================================================
+-- END OF FILE : schema-transactions.sql
+-- ======================================================

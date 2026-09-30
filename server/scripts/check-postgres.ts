@@ -11,10 +11,24 @@
 
 import { pool, pingPostgres } from '../src/db/postgres.js';
 
+// ======================================================
+// START: Script Functions
+// ======================================================
+
+// ======================================================
+// Function : rows
+// Purpose  : Runs a read-only query and returns the result rows typed as T.
+// ======================================================
+
 async function rows<T>(query: string): Promise<T[]> {
   const result = await pool.query(query);
   return result.rows as T[];
 }
+
+// ======================================================
+// Function : main
+// Purpose  : Pings Postgres and prints the stored row counts so they can be compared with the Dashboard.
+// ======================================================
 
 async function main(): Promise<void> {
   const ok = await pingPostgres();
@@ -81,3 +95,11 @@ main().catch((err) => {
   console.error('Check failed:', err);
   process.exit(1);
 });
+
+// ======================================================
+// END: Script Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : check-postgres.ts
+// ======================================================

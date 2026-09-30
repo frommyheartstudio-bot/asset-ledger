@@ -5,6 +5,7 @@
 
 import cors from 'cors';
 import express from 'express';
+import { booksRouter } from './routes/books.js';
 import { assetsRouter } from './routes/assets.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { forecastingRouter, reportingRouter, usersRouter, configRouter } from './routes/misc.js';
@@ -31,6 +32,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/books', booksRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/lifecycle', lifecycleRouter);
 app.use('/api/modeling', modelingRouter);
@@ -88,3 +90,6 @@ start().catch((err) => {
 // END: index Functions
 // ======================================================
 
+// ======================================================
+// END OF FILE : index.ts
+// ======================================================

@@ -8,6 +8,10 @@
 
 import pg from 'pg';
 
+// ======================================================
+// START: Database Functions
+// ======================================================
+
 const { Pool } = pg;
 
 // Neon requires SSL. `sslmode=require` in the connection string is
@@ -19,6 +23,11 @@ export const pool = new Pool({
   ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false }
 });
 
+// ======================================================
+// Function : pingPostgres
+// Purpose  : Quick connectivity check; returns true when "SELECT 1" succeeds, false otherwise.
+// ======================================================
+
 // Quick connectivity check — call this once at server boot if you want
 // an early, clear error instead of a failure on first query.
 export async function pingPostgres(): Promise<boolean> {
@@ -29,3 +38,11 @@ export async function pingPostgres(): Promise<boolean> {
     return false;
   }
 }
+
+// ======================================================
+// END: Database Functions
+// ======================================================
+
+// ======================================================
+// END OF FILE : postgres.ts
+// ======================================================

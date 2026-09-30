@@ -16,6 +16,10 @@ import { Retirement } from './Retirement';
 import { Reinstatement } from './Reinstatement';
 import { Reclassification } from './Reclassification';
 
+// ======================================================
+// START: Form Component Map
+// ======================================================
+
 export const EVENT_FORM_COMPONENTS = {
     addition: Addition,
     adjustment: Adjustment,
@@ -24,3 +28,11 @@ export const EVENT_FORM_COMPONENTS = {
     reinstatement: Reinstatement,
     reclassification: Reclassification
 };
+
+// ======================================================
+// END: Form Component Map
+// ======================================================
+
+// ======================================================
+// END OF FILE : index.js
+// ======================================================
