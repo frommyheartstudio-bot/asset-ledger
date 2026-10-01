@@ -26,7 +26,7 @@ import type { Asset, DepreciationScheduleRow } from '../types.js';
 import { DEFAULT_BOOK } from '../data/books.js';
 import { depreciationSchedules } from '../data/assets.js';
 import { buildSchedule, inServiceDate, round2, toISODate } from './schedule-builder.js';
-import { loadCustomAssetClasses, type CustomAssetClassRow } from '../db/repo.js';
+import { loadClassHistory, loadCustomAssetClasses, type ClassVersion, type CustomAssetClassRow } from '../db/repo.js';
 
 // ======================================================
 // START: Types
@@ -54,6 +54,8 @@ let rulesByBook = new Map<string, Map<string, CustomAssetClassRow>>();
 // Built schedules, keyed by everything that can change them. Cleared
 // whenever the rules are re-read so an edited rule shows up right away.
 const scheduleCache = new Map<string, DepreciationScheduleRow[]>();
+// "c:<rule id>" -> that rule's versions, oldest first (Asset Classes change history).
+let historyByRule = new Map<string, ClassVersion[]>();
 
 // ======================================================
 // Function : setBookRules
@@ -88,7 +90,11 @@ export async function primeBookRules(force = false): Promise<void> {
   if (!rulesInflight) {
     rulesInflight = (async () => {
       try {
-        setBookRules(await loadCustomAssetClasses());
+        const [rules, history] = await Promise.all([loadCustomAssetClasses(), loadClassHistory().catch(() => [] as ClassVersion[])]);
+        const byRule = new Map<string, ClassVersion[]>();
+        for (const v of history) if (v.scope === 'custom') byRule.set(v.classKey, [...(byRule.get(v.classKey) ?? []), v]);
+        historyByRule = byRule;
+        setBookRules(rules);
       } catch (err) {
         console.error('[book-view] could not refresh book rules:', err instanceof Error ? err.message : err);
       } finally {
@@ -104,8 +110,17 @@ export async function primeBookRules(force = false): Promise<void> {
 // Purpose  : The Customize Table row for (book, asset class), if any.
 // ======================================================
 
-function ruleFor(book: string, assetClass: string): CustomAssetClassRow | undefined {
-  return rulesByBook.get(book.trim().toLowerCase())?.get((assetClass ?? '').trim().toLowerCase());
+function ruleFor(book: string, assetClass: string, pisDate?: string | null): CustomAssetClassRow | undefined {
+  const rule = rulesByBook.get(book.trim().toLowerCase())?.get((assetClass ?? '').trim().toLowerCase());
+  if (!rule || !pisDate) return rule;
+  // Effective-dated: an asset placed in service before an edit keeps the values
+  // that applied back then (the latest version whose effective date is on/before
+  // its PIS date; earlier than every version -> the original/baseline one).
+  const versions = historyByRule.get(`c:${rule.id}`);
+  if (!versions || !versions.length) return rule;
+  let pick = versions[0];
+  for (const v of versions) if (v.effectiveFrom <= pisDate) pick = v;
+  return { ...rule, method: pick.method, ratePct: pick.ratePct, convention: pick.convention, life: pick.life, bonusPct: pick.bonusPct };
 }
 
 // ======================================================
@@ -273,7 +288,7 @@ export function scheduleForBook(asset: Asset, book: string): DepreciationSchedul
   const stored = depreciationSchedules[asset.assetNumber] ?? [];
   if (book === DEFAULT_BOOK) return stored;
 
-  const rule = ruleFor(book, asset.assetClass);
+  const rule = ruleFor(book, asset.assetClass, toISODate(asset.taxFactPattern?.placedInService));
   if (!rule) return stored;
 
   const key = [book, asset.assetNumber, asset.cost, asset.taxFactPattern?.placedInService ?? '', rule.id, rule.method, rule.ratePct, rule.convention, rule.life].join('|');
@@ -325,7 +340,7 @@ function accumulatedToDate(asset: Asset, rows: DepreciationScheduleRow[]): numbe
 export function viewAssetForBook(asset: Asset, book: string): BookAssetView {
   if (book === DEFAULT_BOOK) return { ...asset, book, ruleSource: 'stored' };
 
-  const rule = ruleFor(book, asset.assetClass);
+  const rule = ruleFor(book, asset.assetClass, toISODate(asset.taxFactPattern?.placedInService));
   if (!rule) return { ...asset, book, ruleSource: 'federal-mirror' };
 
   const rows = scheduleForBook(asset, book);

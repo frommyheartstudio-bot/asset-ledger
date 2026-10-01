@@ -17,6 +17,7 @@ import { Reporting } from './pages/Compliance/Reporting';
 import { Pub946Tables } from './pages/Configuration/Pub946Tables';
 import { BonusDepreciation } from './pages/Configuration/BonusDepreciation';
 import { AssetClasses } from './pages/Configuration/AssetClasses';
+import { BooksList } from './pages/Configuration/BooksList';
 import { Users } from './pages/Administration/Users';
 import { RequireView } from './context/RequireView';
 import { ProtectedRoute } from './context/ProtectedRoute';
@@ -49,6 +50,7 @@ export default function App() {
       <Route path="/configuration/pub946" element={<ProtectedRoute><RequireView menuId="pub946"><Pub946Tables /></RequireView></ProtectedRoute>}/>
       <Route path="/configuration/bonus-depreciation" element={<ProtectedRoute><RequireView menuId="bonus"><BonusDepreciation /></RequireView></ProtectedRoute>}/>
       <Route path="/configuration/asset-classes" element={<ProtectedRoute><RequireView menuId="assetClasses"><AssetClasses /></RequireView></ProtectedRoute>}/>
+      <Route path="/configuration/books" element={<ProtectedRoute><RequireView menuId="books"><BooksList /></RequireView></ProtectedRoute>}/>
       <Route path="/users" element={<ProtectedRoute><RequireView menuId="users"><Users /></RequireView></ProtectedRoute>}/>
       <Route path="*" element={<Navigate to="/" replace/>}/>
     </Routes>);

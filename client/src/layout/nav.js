@@ -36,7 +36,8 @@ export const NAV = [
         items: [
             { id: 'pub946', icon: '📋', label: 'Pub 946 Tables', href: '/configuration/pub946', capability: 'editConfig' },
             { id: 'bonus', icon: '％', label: 'Bonus Depreciation', href: '/configuration/bonus-depreciation', capability: 'editConfig' },
-            { id: 'assetClasses', icon: '🏷️', label: 'Asset Classes', href: '/configuration/asset-classes', capability: 'editConfig' }
+            { id: 'assetClasses', icon: '🏷️', label: 'Asset Classes', href: '/configuration/asset-classes', capability: 'editConfig' },
+            { id: 'books', icon: '📚', label: 'Books List', href: '/configuration/books', capability: 'editConfig' }
         ]
     },
     { group: 'Administration', items: [{ id: 'users', icon: '◍', label: 'User Management', href: '/users', capability: 'manageUsers' }] }

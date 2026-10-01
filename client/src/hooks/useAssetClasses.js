@@ -8,7 +8,7 @@
 //                                       selected on Configuration -> Asset
 //                                       Classes: Default or Customize)
 //               useAssetClassRows()  -> full rows (name, propertyType,
-//                                       method, ratePct, convention, life)
+//                                       method, ratePct, convention, life, bonusPct)
 // ======================================================
 
 import { useEffect, useMemo, useState } from 'react';
@@ -96,7 +96,11 @@ function load(kind) {
 // ======================================================
 /** Drop the cached Customize Table rows (call after an edit) so dropdowns pick up the change. */
 export function invalidateCustomAssetClasses() {
+    // The custom table embeds the default rows, so both caches must go
+    // (a default row can now be deleted too).
     cache.custom = null;
+    cache.default = null;
+    historyCache = null;
     window.dispatchEvent(new CustomEvent(TABLE_EVENT, { detail: getActiveAssetClassTable() }));
 }
 
@@ -105,7 +109,7 @@ export function invalidateCustomAssetClasses() {
 // Purpose  : Hook returning the full rows of the currently selected asset-class table.
 // ======================================================
 /** Rows of the currently selected table, in table order ([] until loaded).
- *  Same shape either way: { name, propertyType, method, ratePct, convention, life }. */
+ *  Same shape either way: { name, propertyType, method, ratePct, convention, life, bonusPct }. */
 export function useAssetClassRows() {
     const [kind, setKind] = useState(getActiveAssetClassTable);
     const [rows, setRows] = useState(() => cache[getActiveAssetClassTable()] ?? []);
@@ -132,6 +136,63 @@ export function useAssetClasses() {
     const rows = useAssetClassRows();
     // Names are the value stored on an asset; dedupe defensively.
     return useMemo(() => Array.from(new Set(rows.map((r) => r.name))), [rows]);
+}
+
+// ======================================================
+// Function : useAssetClassHistory
+// Purpose  : Hook returning every saved version of edited asset class rows (oldest first), so the
+//            Addition form can use the values that were valid on an asset's placed-in-service date.
+// ======================================================
+let historyCache = null;
+let historyInflight = null;
+function loadHistory() {
+    if (historyCache) return Promise.resolve(historyCache);
+    if (!historyInflight) {
+        historyInflight = configApi.getAllClassHistory()
+            .then((rows) => { historyCache = Array.isArray(rows) ? rows : []; return historyCache; })
+            .catch(() => [])
+            .finally(() => { historyInflight = null; });
+    }
+    return historyInflight;
+}
+export function useAssetClassHistory() {
+    const [history, setHistory] = useState(() => historyCache ?? []);
+    const [tick, setTick] = useState(0);
+    useEffect(() => {
+        const onChange = () => setTick((t) => t + 1);
+        window.addEventListener(TABLE_EVENT, onChange);
+        return () => window.removeEventListener(TABLE_EVENT, onChange);
+    }, []);
+    useEffect(() => {
+        let alive = true;
+        loadHistory().then((r) => { if (alive) setHistory(r); });
+        return () => { alive = false; };
+    }, [tick]);
+    return history;
+}
+
+// ======================================================
+// Function : classKeyOf
+// Purpose  : Key a row is stored under in the history ("c:<id>" custom rule, "d:<id>" default row).
+// ======================================================
+export function classKeyOf(row) {
+    return row && row.book !== undefined ? `c:${row.id}` : `d:${row.id}`;
+}
+
+// ======================================================
+// Function : resolveClassVersion
+// Purpose  : The values of a class row that applied on a placed-in-service date: the latest saved
+//            version effective on/before that date (older than all of them -> the original). Returns the
+//            row itself when it was never edited or no date is known yet.
+// ======================================================
+export function resolveClassVersion(row, history, pis) {
+    if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(pis || '')) return row;
+    const key = classKeyOf(row);
+    const versions = (history || []).filter((v) => v.classKey === key);
+    if (!versions.length) return row;
+    let pick = versions[0];
+    for (const v of versions) if (v.effectiveFrom <= pis) pick = v;
+    return pick;
 }
 
 // ======================================================

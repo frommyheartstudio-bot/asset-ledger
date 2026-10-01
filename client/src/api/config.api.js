@@ -13,10 +13,14 @@ import { api } from './client';
 
 export const configApi = {
     getAssetClasses: () => api.get('/config/asset-classes'),
+    updateAssetClass: (id, body) => api.put(`/config/asset-classes/${id}`, body),
+    deleteAssetClass: (id) => api.del(`/config/asset-classes/${id}`),
     getCustomAssetClasses: () => api.get('/config/asset-classes/custom'),
     updateCustomAssetClass: (id, body) => api.put(`/config/asset-classes/custom/${id}`, body),
     createCustomAssetClass: (body) => api.post('/config/asset-classes/custom', body),
     deleteCustomAssetClass: (id) => api.del(`/config/asset-classes/custom/${id}`),
+    getClassHistory: (scope, id) => api.get(`/config/asset-classes/history?scope=${scope}&id=${id}`),
+    getAllClassHistory: () => api.get('/config/asset-classes/history'),
 };
 
 // ======================================================

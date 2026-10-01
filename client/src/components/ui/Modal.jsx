@@ -14,7 +14,7 @@
 // Purpose  : React component that renders the 'Modal' UI
 // ======================================================
 
-export function Modal({ open, title, onClose, children, footer }) {
+export function Modal({ open, title, onClose, children, footer, width = 420 }) {
     if (!open)
         return null;
     return (<div onClick={onClose} style={{
@@ -26,7 +26,7 @@ export function Modal({ open, title, onClose, children, footer }) {
             justifyContent: 'center',
             zIndex: 100
         }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 420, maxWidth: '92vw', maxHeight: '85vh', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width, maxWidth: '92vw', maxHeight: '85vh', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column' }}>
         <div className="card-head" style={{ flexShrink: 0 }}>
           <h3>{title}</h3>
           <button className="icon-btn" onClick={onClose} aria-label="Close">

@@ -53,5 +53,37 @@ export const BONUS_DATA = [
 // ======================================================
 
 // ======================================================
+// Function : bonusPctForDate
+// Purpose  : Bonus % (IRC 168(k), same rates as BONUS_DATA above) for a
+//            placed-in-service date given as 'YYYY-MM-DD'. Returns null
+//            when the date is blank or not a full date yet.
+// ======================================================
+
+export function bonusPctForDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return null;
+  const y = Number(iso.slice(0, 4));
+  if (iso >= '2025-01-20') return 100;
+  if (y === 2025) return 40;
+  if (y === 2024) return 60;
+  if (y === 2023) return 80;
+  if (y >= 2018) return 100;
+  if (y === 2017) return iso >= '2017-09-28' ? 100 : 50;
+  if (y >= 2012) return 50;
+  if (y === 2011) return 100;
+  if (y === 2010) return iso >= '2010-09-09' ? 100 : 50;
+  if (y >= 2008) return 50;
+  if (y >= 2005) return 0;
+  if (y === 2004) return 50;
+  if (y === 2003) return iso >= '2003-05-06' ? 50 : 30;
+  if (y === 2002) return 30;
+  if (y === 2001) return iso >= '2001-09-11' ? 30 : 0;
+  return 0;
+}
+
+// ======================================================
+// END: bonusPctForDate
+// ======================================================
+
+// ======================================================
 // END OF FILE : bonusDepreciation.js
 // ======================================================

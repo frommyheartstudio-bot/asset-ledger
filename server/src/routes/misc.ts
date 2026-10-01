@@ -15,7 +15,7 @@ import {
   users as seedUsers
 } from '../data/admin.js';
 import { ASSET_CLASS_SEED } from '../data/assetClasses.js';
-import { createCustomAssetClass, createGeneratedReport, createUser, deleteCustomAssetClass, deleteUser, loadAdmin, loadAssetClasses, loadCustomAssetClasses, seedAdminIfEmpty, seedAssetClassesIfEmpty, updateCustomAssetClass, updateRolePermissions, updateUser } from '../db/repo.js';
+import { createCustomAssetClass, createGeneratedReport, createUser, deleteAssetClass, deleteCustomAssetClass, deleteUser, loadAdmin, loadAssetClasses, loadClassHistory, loadCustomAssetClasses, recordClassChange, recordClassCreated, seedAdminIfEmpty, seedAssetClassesIfEmpty, updateAssetClass, updateCustomAssetClass, updateRolePermissions, updateUser } from '../db/repo.js';
 
 // ======================================================
 // Function : adminData
@@ -214,8 +214,66 @@ configRouter.get('/asset-classes', async (_req, res) => {
 // ======================================================
 
 // ======================================================
+// Function : DELETE /asset-classes/:id
+// Purpose  : Deletes one row of the Default Table (id = its sortOrder).
+//            Drops the short-lived cache so both tables refresh at once.
+// ======================================================
+
+configRouter.delete('/asset-classes/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const ok = await deleteAssetClass(id);
+    if (!ok) return res.status(404).json({ error: 'Row not found' });
+    assetClassesCache = null;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[asset-classes DELETE] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not delete the asset class' });
+  }
+});
+
+// ======================================================
+// END: DELETE /asset-classes/:id
+// ======================================================
+
+// ======================================================
+// Function : PUT /asset-classes/:id
+// Purpose  : Edits one row of the Default Table (id = its sortOrder).
+// ======================================================
+
+configRouter.put('/asset-classes/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const f = {
+      name: str(b.name), propertyType: str(b.propertyType), method: str(b.method),
+      ratePct: str(b.ratePct), convention: str(b.convention), life: str(b.life)
+    };
+    const missing = Object.entries(f).filter(([, v]) => !v).map(([k]) => k);
+    if (missing.length) return res.status(400).json({ error: `Missing or invalid: ${missing.join(', ')}` });
+    const bonusPct = bonusPctOf(b.bonusPct);
+    if (bonusPct === null) return res.status(400).json({ error: 'Bonus % must be blank or a number from 0 to 100' });
+    if (f.ratePct !== 'N/A' && !(Number(f.ratePct) > 0)) return res.status(400).json({ error: 'Rate % must be a positive number or N/A' });
+    if (!/^\d+\s*years?\s*\d+\s*months?$/i.test(f.life)) return res.status(400).json({ error: 'Life must look like "10 years 0 months"' });
+    const before = (await loadAssetClasses()).find((r) => r.id === id);
+    const updated = await updateAssetClass(id, { ...f, bonusPct });
+    if (!updated) return res.status(404).json({ error: 'Row not found' });
+    if (before) await recordClassChange('default', `d:${id}`, before, updated, str(b.changedBy));
+    assetClassesCache = null;
+    await primeBookRules(true);
+    res.json(updated);
+  } catch (err) {
+    console.error('[asset-classes PUT] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not save the asset class' });
+  }
+});
+
+
+// ======================================================
 // Function : /asset-classes/custom  (Customize Table)
-// Purpose  : 3 custom rows (Name, Property Type, Method, Rate %,
+// Purpose  : Custom rules (Name, Property Type, Method, Rate %,
 //            Convention, Life), every column editable.
 // ======================================================
 
@@ -225,6 +283,31 @@ configRouter.get('/asset-classes', async (_req, res) => {
 // ======================================================
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+
+// Function : bonusPctOf
+// Purpose  : Cleans the optional Bonus % field: '' (none), a 0-100 number as text, or null when invalid.
+function bonusPctOf(v: unknown): string | null {
+  const s = typeof v === 'number' ? String(v) : str(v);
+  if (!s) return '';
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? String(n) : null;
+}
+
+// Function : GET /asset-classes/history
+// Purpose  : Fact Table: version history of asset class rows. ?scope=default|custom&id=N
+//            for one row (popup on the Asset Classes page); no query = all rows
+//            (the Addition form uses it to pick the values valid on a PIS date).
+configRouter.get('/asset-classes/history', async (req, res) => {
+  try {
+    const scope = typeof req.query.scope === 'string' ? req.query.scope : '';
+    const id = typeof req.query.id === 'string' ? req.query.id : '';
+    const one = (scope === 'default' || scope === 'custom') && /^\d+$/.test(id);
+    res.json(await loadClassHistory(one ? scope : undefined, one ? `${scope === 'custom' ? 'c' : 'd'}:${id}` : undefined));
+  } catch (err) {
+    console.error('[asset-classes/history] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load the change history' });
+  }
+});
 
 configRouter.get('/asset-classes/custom', async (_req, res) => {
   try {
@@ -238,7 +321,7 @@ configRouter.get('/asset-classes/custom', async (_req, res) => {
 // Function : validateCustomRow
 // Purpose  : Shared checks for adding / editing a custom rule row. Returns
 //            the cleaned fields, or an error message string.
-function validateCustomRow(body: unknown): { fields: { book: string; assetType: string; propertyType: string; method: string; ratePct: string; convention: string; life: string } } | { error: string } {
+function validateCustomRow(body: unknown): { fields: { book: string; assetType: string; propertyType: string; method: string; ratePct: string; convention: string; life: string; bonusPct: string } } | { error: string } {
   const b = (body ?? {}) as Record<string, unknown>;
   const f = {
     book: str(b.book), assetType: str(b.assetType),
@@ -250,7 +333,9 @@ function validateCustomRow(body: unknown): { fields: { book: string; assetType: 
   if (!isKnownBook(f.book)) return { error: `Unknown book "${f.book}"` };
   if (f.ratePct !== 'N/A' && !(Number(f.ratePct) > 0)) return { error: 'Rate % must be a positive number or N/A' };
   if (!/^\d+\s*years?\s*\d+\s*months?$/i.test(f.life)) return { error: 'Life must look like "10 years 0 months"' };
-  return { fields: f };
+  const bonusPct = bonusPctOf(b.bonusPct);
+  if (bonusPct === null) return { error: 'Bonus % must be blank or a number from 0 to 100' };
+  return { fields: { ...f, bonusPct } };
 }
 
 configRouter.post('/asset-classes/custom', async (req, res) => {
@@ -258,6 +343,7 @@ configRouter.post('/asset-classes/custom', async (req, res) => {
     const v = validateCustomRow(req.body);
     if ('error' in v) return res.status(400).json({ error: v.error });
     const created = await createCustomAssetClass(v.fields);
+    await recordClassCreated('custom', `c:${created.id}`, created, str(((req.body ?? {}) as Record<string, unknown>).changedBy));
     await primeBookRules(true); // the new rule applies to that book's tables right away
     res.status(201).json(created);
   } catch (err) {
@@ -286,8 +372,10 @@ configRouter.put('/asset-classes/custom/:id', async (req, res) => {
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const v = validateCustomRow(req.body);
     if ('error' in v) return res.status(400).json({ error: v.error });
+    const before = (await loadCustomAssetClasses()).find((r) => r.id === id);
     const updated = await updateCustomAssetClass(id, v.fields);
     if (!updated) return res.status(404).json({ error: 'Row not found' });
+    if (before) await recordClassChange('custom', `c:${id}`, before, updated, str(((req.body ?? {}) as Record<string, unknown>).changedBy));
     await primeBookRules(true); // an edited rule shows up in that book's tables right away
     res.json(updated);
   } catch (err) {

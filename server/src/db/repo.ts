@@ -550,7 +550,8 @@ export async function seedAdminIfEmpty(seed: {
 //            on, same as the asset book itself.
 // ======================================================
 
-export type AssetClassRow = AssetClassSeedRow;
+// `id` is the row's sortOrder (primary key) - lets the UI delete a default row.
+export type AssetClassRow = AssetClassSeedRow & { id?: number };
 
 // Creates the table on first use, so the page works even if nobody ran
 // `npm run db:schema:apply` yet (same DDL as db/schema.sql). Runs once.
@@ -572,7 +573,24 @@ function ensureAssetClassesTable(): Promise<void> {
          convention      TEXT NOT NULL,
          life            TEXT NOT NULL
        )`
-    ).then(() => undefined).catch((err) => { assetClassesTableReady = null; throw err; });
+    ).then(async () => {
+      // Bonus % column (added later). When the column is new, rows named "... No Bonus" get 0
+      // so they fill 0 into the Addition form; every other row stays blank until edited.
+      const had = await query<Record<string, unknown>>(`SELECT 1 FROM information_schema.columns WHERE table_name='asset_classes' AND column_name='bonusPct'`);
+      await pool.query(`ALTER TABLE asset_classes ADD COLUMN IF NOT EXISTS "bonusPct" TEXT NOT NULL DEFAULT ''`);
+      if (!had.length) await pool.query(`UPDATE asset_classes SET "bonusPct"='0' WHERE name ILIKE '%No Bonus%'`);
+      // One-time repair: the seed once lost the leading zero on the 00.xx classes
+      // ("0.11", "0.12", "0.241" ... instead of "00.11", "00.12", "00.241").
+      // Add the missing zero (only when the "00." name isn't already taken); harmless when already fixed.
+      await pool.query(
+        `UPDATE asset_classes a SET name='0' || a.name
+          WHERE a.name ~ '^0\\.[0-9]+$'
+            AND NOT EXISTS (SELECT 1 FROM asset_classes b WHERE b.name='0' || a.name)`
+      );
+      // Keep anything that already refers to an old name in step (tables may not exist yet - ignore).
+      await pool.query(`UPDATE assets SET "assetClass"='0' || "assetClass" WHERE "assetClass" ~ '^0\\.[0-9]+$'`).catch(() => undefined);
+      await pool.query(`UPDATE asset_class_custom_table SET "assetType"='0' || "assetType" WHERE "assetType" ~ '^0\\.[0-9]+$'`).catch(() => undefined);
+    }).catch((err) => { assetClassesTableReady = null; throw err; });
   }
   return assetClassesTableReady;
 }
@@ -588,13 +606,62 @@ export async function loadAssetClasses(): Promise<AssetClassRow[]> {
     `SELECT * FROM asset_classes ORDER BY "sortOrder" ASC`
   );
   return rows.map((r) => ({
+    id: Number(r.sortOrder),
     name: String(r.name ?? ''),
     propertyType: String(r.propertyType ?? ''),
     method: String(r.method ?? ''),
     ratePct: String(r.ratePct ?? ''),
     convention: String(r.convention ?? ''),
-    life: String(r.life ?? '')
+    life: String(r.life ?? ''),
+    bonusPct: String(r.bonusPct ?? '')
   }));
+}
+
+// ======================================================
+// Function : deleteAssetClass
+// Purpose  : Deletes one default asset class row (by its sortOrder id); false when it doesn't exist.
+// ======================================================
+
+export async function deleteAssetClass(id: number): Promise<boolean> {
+  await ensureAssetClassesTable();
+  const rows = await query<Record<string, unknown>>(`DELETE FROM asset_classes WHERE "sortOrder"=$1 RETURNING "sortOrder"`, [id]);
+  return rows.length > 0;
+}
+
+// ======================================================
+// Function : updateAssetClass
+// Purpose  : Edits one Default Table row (by its sortOrder id) and returns the
+//            saved row (null when it doesn't exist). When the Name is changed,
+//            assets and Customize Table rules that used the old name follow it.
+// ======================================================
+
+export async function updateAssetClass(id: number, f: Omit<AssetClassRow, 'id'>): Promise<AssetClassRow | null> {
+  await ensureAssetClassesTable();
+  const old = await query<Record<string, unknown>>(`SELECT name FROM asset_classes WHERE "sortOrder"=$1`, [id]);
+  if (!old.length) return null;
+  const oldName = String(old[0].name ?? '');
+  const rows = await query<Record<string, unknown>>(
+    `UPDATE asset_classes
+        SET name=$2, "propertyType"=$3, method=$4, "ratePct"=$5, convention=$6, life=$7, "bonusPct"=$8
+      WHERE "sortOrder"=$1
+      RETURNING *`,
+    [id, f.name, f.propertyType, f.method, f.ratePct, f.convention, f.life, f.bonusPct ?? '']
+  );
+  if (oldName !== f.name) {
+    await pool.query(`UPDATE assets SET "assetClass"=$2 WHERE "assetClass"=$1`, [oldName, f.name]).catch(() => undefined);
+    await pool.query(`UPDATE asset_class_custom_table SET "assetType"=$2 WHERE "assetType"=$1`, [oldName, f.name]).catch(() => undefined);
+  }
+  const r = rows[0];
+  return {
+    id: Number(r.sortOrder),
+    name: String(r.name ?? ''),
+    propertyType: String(r.propertyType ?? ''),
+    method: String(r.method ?? ''),
+    ratePct: String(r.ratePct ?? ''),
+    convention: String(r.convention ?? ''),
+    life: String(r.life ?? ''),
+    bonusPct: String(r.bonusPct ?? '')
+  };
 }
 
 // ======================================================
@@ -613,10 +680,10 @@ export async function seedAssetClassesIfEmpty(seed: AssetClassRow[]): Promise<bo
     for (let i = 0; i < seed.length; i++) {
       const r = seed[i];
       await client.query(
-        `INSERT INTO asset_classes ("sortOrder", name, "propertyType", method, "ratePct", convention, life)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `INSERT INTO asset_classes ("sortOrder", name, "propertyType", method, "ratePct", convention, life, "bonusPct")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT ("sortOrder") DO NOTHING`,
-        [i, r.name, r.propertyType, r.method, r.ratePct, r.convention, r.life]
+        [i, r.name, r.propertyType, r.method, r.ratePct, r.convention, r.life, r.bonusPct ?? (/no bonus/i.test(r.name) ? '0' : '')]
       );
     }
     await client.query('COMMIT');
@@ -636,12 +703,12 @@ export async function seedAssetClassesIfEmpty(seed: AssetClassRow[]): Promise<bo
 // ======================================================
 // Function : Custom asset classes (Configuration -> Asset Classes ->
 //            "Customize Table")
-// Purpose  : 3 rows, same 6 columns as the default table (Name, Property
+// Purpose  : User-added rules, same 6 columns as the default table (Name, Property
 //            Type, Method, Rate %, Convention, Life). The Name is the Book
 //            followed by the asset type, e.g. "GAAP - Acquisition"; the
 //            two parts are stored separately so each can be edited.
-//            Seeded once, when the table is empty. The default
-//            asset_classes table is never touched.
+//            Starts empty. The default asset_classes table is not touched
+//            by edits here.
 // ======================================================
 
 export interface CustomAssetClassRow extends AssetClassRow {
@@ -650,7 +717,10 @@ export interface CustomAssetClassRow extends AssetClassRow {
   assetType: string;
 }
 
-const CUSTOM_ASSET_CLASS_SEED: Array<Omit<CustomAssetClassRow, 'id' | 'name'>> = [
+// The 3 starter rows this table used to be seeded with. They are no longer
+// wanted: the Customize Table starts empty (only the default rows show under
+// the custom rules). They are deleted once from databases that already have them.
+const LEGACY_STARTER_ROWS: Array<Omit<CustomAssetClassRow, 'id' | 'name'>> = [
   { book: 'GAAP', assetType: 'Acquisition', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '0 years 0 months' },
   { book: 'GAAP', assetType: 'Alternative Energy Property', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '10 years 0 months' },
   { book: 'GAAP', assetType: 'Alternative Energy Property - ADS', propertyType: 'PP - Personal Property', method: 'SL - Straight Line', ratePct: '100', convention: 'FM - Full-Month', life: '10 years 0 months' }
@@ -673,16 +743,17 @@ function ensureCustomRowsTable(): Promise<void> {
          method          TEXT NOT NULL,
          "ratePct"       TEXT NOT NULL,
          convention      TEXT NOT NULL,
-         life            TEXT NOT NULL
+         life            TEXT NOT NULL,
+         "bonusPct"      TEXT NOT NULL DEFAULT ''
        )`
-    ).then(() => undefined).catch((err) => { customRowsTableReady = null; throw err; });
+    ).then(() => pool.query(`ALTER TABLE asset_class_custom_table ADD COLUMN IF NOT EXISTS "bonusPct" TEXT NOT NULL DEFAULT ''`)).then(() => undefined).catch((err) => { customRowsTableReady = null; throw err; });
   }
   return customRowsTableReady;
 }
 
 // ======================================================
 // Function : toCustomRow
-// Purpose  : Maps a raw custom-table row to a CustomAssetClassRow (builds the Name from Book + asset type).
+// Purpose  : Maps a raw custom-table row to a CustomAssetClassRow (Name = asset type; Book is its own field).
 // ======================================================
 
 function toCustomRow(r: Record<string, unknown>): CustomAssetClassRow {
@@ -692,39 +763,38 @@ function toCustomRow(r: Record<string, unknown>): CustomAssetClassRow {
     id: Number(r.id),
     book,
     assetType,
-    name: `${book} - ${assetType}`,
+    name: assetType, // Book is a separate field - it is not part of the Name
     propertyType: String(r.propertyType ?? ''),
     method: String(r.method ?? ''),
     ratePct: String(r.ratePct ?? ''),
     convention: String(r.convention ?? ''),
-    life: String(r.life ?? '')
+    life: String(r.life ?? ''),
+    bonusPct: String(r.bonusPct ?? '')
   };
 }
 
 // ======================================================
 // Function : loadCustomAssetClasses
-// Purpose  : Reads the custom asset class rows, seeding the default rows on first use.
+// Purpose  : Reads the custom asset class rows (rules the user added). No starter rows are seeded.
 // ======================================================
 
 export async function loadCustomAssetClasses(): Promise<CustomAssetClassRow[]> {
   await ensureCustomRowsTable();
-  // The 3 starter rows are inserted ONCE. A marker row records that, so a
-  // person who deletes every rule doesn't get the starter rows back on the
-  // next read (rules can now be added and deleted, not just edited).
-  await pool.query(`CREATE TABLE IF NOT EXISTS asset_class_custom_seeded (done BOOLEAN NOT NULL)`);
-  const [{ c }] = await query<{ c: string }>(`SELECT count(*) AS c FROM asset_class_custom_table`);
-  const [{ m }] = await query<{ m: string }>(`SELECT count(*) AS m FROM asset_class_custom_seeded`);
+  // One-time cleanup: remove the 3 old starter rows (only if still exactly as
+  // seeded - an edited row is a real rule and is kept). A marker row records
+  // that this ran, so nothing is ever re-seeded or re-deleted afterwards.
+  await pool.query(`CREATE TABLE IF NOT EXISTS asset_class_custom_starter_removed (done BOOLEAN NOT NULL)`);
+  const [{ m }] = await query<{ m: string }>(`SELECT count(*) AS m FROM asset_class_custom_starter_removed`);
   if (Number(m) === 0) {
-    if (Number(c) === 0) {
-      for (const r of CUSTOM_ASSET_CLASS_SEED) {
-        await pool.query(
-          `INSERT INTO asset_class_custom_table (book, "assetType", "propertyType", method, "ratePct", convention, life)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [r.book, r.assetType, r.propertyType, r.method, r.ratePct, r.convention, r.life]
-        );
-      }
+    for (const r of LEGACY_STARTER_ROWS) {
+      await pool.query(
+        `DELETE FROM asset_class_custom_table
+          WHERE book=$1 AND "assetType"=$2 AND "propertyType"=$3 AND method=$4
+            AND "ratePct"=$5 AND convention=$6 AND life=$7`,
+        [r.book, r.assetType, r.propertyType, r.method, r.ratePct, r.convention, r.life]
+      );
     }
-    await pool.query(`INSERT INTO asset_class_custom_seeded (done) VALUES (true)`);
+    await pool.query(`INSERT INTO asset_class_custom_starter_removed (done) VALUES (true)`);
   }
   const rows = await query<Record<string, unknown>>(`SELECT * FROM asset_class_custom_table ORDER BY id ASC`);
   return rows.map(toCustomRow);
@@ -740,10 +810,10 @@ export async function updateCustomAssetClass(id: number, f: Omit<CustomAssetClas
   const rows = await query<Record<string, unknown>>(
     `UPDATE asset_class_custom_table
         SET book=$2, "assetType"=$3, "propertyType"=$4, method=$5,
-            "ratePct"=$6, convention=$7, life=$8
+            "ratePct"=$6, convention=$7, life=$8, "bonusPct"=$9
       WHERE id=$1
       RETURNING *`,
-    [id, f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life]
+    [id, f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life, f.bonusPct ?? '']
   );
   return rows.length ? toCustomRow(rows[0]) : null;
 }
@@ -759,10 +829,10 @@ export async function updateCustomAssetClass(id: number, f: Omit<CustomAssetClas
 export async function createCustomAssetClass(f: Omit<CustomAssetClassRow, 'id' | 'name'>): Promise<CustomAssetClassRow> {
   await ensureCustomRowsTable();
   const rows = await query<Record<string, unknown>>(
-    `INSERT INTO asset_class_custom_table (book, "assetType", "propertyType", method, "ratePct", convention, life)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `INSERT INTO asset_class_custom_table (book, "assetType", "propertyType", method, "ratePct", convention, life, "bonusPct")
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      RETURNING *`,
-    [f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life]
+    [f.book, f.assetType, f.propertyType, f.method, f.ratePct, f.convention, f.life, f.bonusPct ?? '']
   );
   return toCustomRow(rows[0]);
 }
@@ -780,6 +850,199 @@ export async function deleteCustomAssetClass(id: number): Promise<boolean> {
 
 // ======================================================
 // END: Custom asset classes
+// ======================================================
+
+// ======================================================
+// Function : Asset class FACT TABLE (effective-dated versions)
+// Purpose  : The Fact Table is append-only and permanent: rows are only ever
+//            inserted (Postgres triggers reject UPDATE, DELETE and TRUNCATE),
+//            so every update ever made to an asset class stays visible.
+//            Every edit of a Default Table or Customize Table row is kept as
+//            a version: the values that apply FROM the day of the edit.
+//            The first edit of a row also stores its original values as a
+//            baseline version (effectiveFrom 1900-01-01). Anything dated
+//            before an edit keeps resolving to the older version, so e.g.
+//            "Bonus 100% until yesterday, 90% from today" leaves old
+//            assets at 100% (see resolveClassVersion callers).
+//            classKey = "d:<sortOrder>" (default row) or "c:<id>" (custom rule).
+// ======================================================
+
+export interface ClassChange { field: string; from: string; to: string }
+export interface ClassVersion {
+  id: number;
+  scope: 'default' | 'custom';
+  classKey: string;
+  name: string;
+  book: string;
+  effectiveFrom: string;
+  changedAt: string;
+  changedBy: string;
+  propertyType: string;
+  method: string;
+  ratePct: string;
+  convention: string;
+  life: string;
+  bonusPct: string;
+  changes: ClassChange[];
+}
+
+export const CLASS_BASELINE_DATE = '1900-01-01';
+const TRACKED_FIELDS = ['name', 'book', 'propertyType', 'method', 'ratePct', 'convention', 'life', 'bonusPct'] as const;
+
+let historyTableReady: Promise<void> | null = null;
+// ======================================================
+// Function : ensureHistoryTable
+// Purpose  : Creates the asset_class_fact_table table on first use (runs once), carries over rows
+//            of its earlier name (asset_class_history), and installs the triggers that make it
+//            append-only.
+// ======================================================
+
+function ensureHistoryTable(): Promise<void> {
+  if (!historyTableReady) {
+    historyTableReady = pool.query(
+      `CREATE TABLE IF NOT EXISTS asset_class_fact_table (
+         id               SERIAL PRIMARY KEY,
+         scope            TEXT NOT NULL,
+         "classKey"       TEXT NOT NULL,
+         name             TEXT NOT NULL DEFAULT '',
+         book             TEXT NOT NULL DEFAULT '',
+         "effectiveFrom"  DATE NOT NULL,
+         "changedAt"      TIMESTAMPTZ NOT NULL DEFAULT now(),
+         "changedBy"      TEXT NOT NULL DEFAULT '',
+         "propertyType"   TEXT NOT NULL DEFAULT '',
+         method           TEXT NOT NULL DEFAULT '',
+         "ratePct"        TEXT NOT NULL DEFAULT '',
+         convention       TEXT NOT NULL DEFAULT '',
+         life             TEXT NOT NULL DEFAULT '',
+         "bonusPct"       TEXT NOT NULL DEFAULT '',
+         changes          TEXT NOT NULL DEFAULT '[]'
+       )`
+    ).then(async () => {
+      // Earlier builds called this table asset_class_history: copy its rows over once.
+      const old = await query<Record<string, unknown>>(`SELECT to_regclass('asset_class_history') AS t`);
+      if (old[0]?.t) {
+        const [{ c }] = await query<{ c: string }>(`SELECT count(*) AS c FROM asset_class_fact_table`);
+        if (Number(c) === 0) {
+          await pool.query(
+            `INSERT INTO asset_class_fact_table (scope, "classKey", name, book, "effectiveFrom", "changedAt", "changedBy", "propertyType", method, "ratePct", convention, life, "bonusPct", changes)
+             SELECT scope, "classKey", name, book, "effectiveFrom", "changedAt", "changedBy", "propertyType", method, "ratePct", convention, life, "bonusPct", changes
+               FROM asset_class_history ORDER BY id`
+          );
+        }
+      }
+      // Append-only: nothing may ever change or remove a Fact Table row.
+      await pool.query(
+        `CREATE OR REPLACE FUNCTION asset_class_fact_table_locked() RETURNS trigger AS $f$
+         BEGIN RAISE EXCEPTION 'asset_class_fact_table is append-only: rows cannot be changed or deleted'; END;
+         $f$ LANGUAGE plpgsql;
+         DROP TRIGGER IF EXISTS asset_class_fact_table_no_change ON asset_class_fact_table;
+         CREATE TRIGGER asset_class_fact_table_no_change BEFORE UPDATE OR DELETE ON asset_class_fact_table
+           FOR EACH ROW EXECUTE FUNCTION asset_class_fact_table_locked();
+         DROP TRIGGER IF EXISTS asset_class_fact_table_no_truncate ON asset_class_fact_table;
+         CREATE TRIGGER asset_class_fact_table_no_truncate BEFORE TRUNCATE ON asset_class_fact_table
+           FOR EACH STATEMENT EXECUTE FUNCTION asset_class_fact_table_locked();`
+      );
+    }).then(() => undefined).catch((err) => { historyTableReady = null; throw err; });
+  }
+  return historyTableReady;
+}
+
+// ======================================================
+// Function : toVersion
+// Purpose  : Maps a raw history row to a ClassVersion.
+// ======================================================
+
+function toVersion(r: Record<string, unknown>): ClassVersion {
+  const eff = r.effectiveFrom instanceof Date ? r.effectiveFrom.toISOString().slice(0, 10) : String(r.effectiveFrom ?? '').slice(0, 10);
+  let changes: ClassChange[] = [];
+  try { changes = JSON.parse(String(r.changes ?? '[]')); } catch { changes = []; }
+  return {
+    id: Number(r.id),
+    scope: r.scope === 'custom' ? 'custom' : 'default',
+    classKey: String(r.classKey ?? ''),
+    name: String(r.name ?? ''),
+    book: String(r.book ?? ''),
+    effectiveFrom: eff,
+    changedAt: r.changedAt instanceof Date ? r.changedAt.toISOString() : String(r.changedAt ?? ''),
+    changedBy: String(r.changedBy ?? ''),
+    propertyType: String(r.propertyType ?? ''),
+    method: String(r.method ?? ''),
+    ratePct: String(r.ratePct ?? ''),
+    convention: String(r.convention ?? ''),
+    life: String(r.life ?? ''),
+    bonusPct: String(r.bonusPct ?? ''),
+    changes
+  };
+}
+
+// ======================================================
+// Function : recordClassChange
+// Purpose  : Called after an edit. Does nothing when no tracked field changed;
+//            otherwise stores the baseline (first edit only) and the new
+//            version effective from today.
+// ======================================================
+
+export async function recordClassChange(
+  scope: 'default' | 'custom',
+  classKey: string,
+  beforeRow: object,
+  afterRow: object,
+  changedBy: string
+): Promise<void> {
+  await ensureHistoryTable();
+  const before = beforeRow as Record<string, unknown>;
+  const after = afterRow as Record<string, unknown>;
+  const changes: ClassChange[] = [];
+  for (const f of TRACKED_FIELDS) {
+    const a = String(before[f] ?? '');
+    const b = String(after[f] ?? '');
+    if (a !== b) changes.push({ field: f, from: a, to: b });
+  }
+  if (!changes.length) return;
+  const insert = (v: Record<string, unknown>, eff: string | null, by: string, ch: ClassChange[]) => pool.query(
+    `INSERT INTO asset_class_fact_table (scope, "classKey", name, book, "effectiveFrom", "changedBy", "propertyType", method, "ratePct", convention, life, "bonusPct", changes)
+     VALUES ($1,$2,$3,$4, COALESCE($5::date, CURRENT_DATE), $6,$7,$8,$9,$10,$11,$12,$13)`,
+    [scope, classKey, String(v.name ?? ''), String(v.book ?? ''), eff, by, String(v.propertyType ?? ''), String(v.method ?? ''),
+      String(v.ratePct ?? ''), String(v.convention ?? ''), String(v.life ?? ''), String(v.bonusPct ?? ''), JSON.stringify(ch)]
+  );
+  const [{ c }] = await query<{ c: string }>(`SELECT count(*) AS c FROM asset_class_fact_table WHERE scope=$1 AND "classKey"=$2`, [scope, classKey]);
+  if (Number(c) === 0) await insert(before, CLASS_BASELINE_DATE, 'Original', []);
+  await insert(after, null, changedBy || 'Unknown', changes);
+}
+
+// ======================================================
+// Function : recordClassCreated
+// Purpose  : Writes the first Fact Table entry of a newly added rule (its original values).
+// ======================================================
+
+export async function recordClassCreated(scope: 'default' | 'custom', classKey: string, rowObj: object, createdBy: string): Promise<void> {
+  await ensureHistoryTable();
+  const v = rowObj as Record<string, unknown>;
+  const [{ c }] = await query<{ c: string }>(`SELECT count(*) AS c FROM asset_class_fact_table WHERE scope=$1 AND "classKey"=$2`, [scope, classKey]);
+  if (Number(c) > 0) return;
+  await pool.query(
+    `INSERT INTO asset_class_fact_table (scope, "classKey", name, book, "effectiveFrom", "changedBy", "propertyType", method, "ratePct", convention, life, "bonusPct", changes)
+     VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,'[]')`,
+    [scope, classKey, String(v.name ?? ''), String(v.book ?? ''), CLASS_BASELINE_DATE, createdBy || 'Unknown', String(v.propertyType ?? ''), String(v.method ?? ''),
+      String(v.ratePct ?? ''), String(v.convention ?? ''), String(v.life ?? ''), String(v.bonusPct ?? '')]
+  );
+}
+
+// ======================================================
+// Function : loadClassHistory
+// Purpose  : Versions oldest-first (by effective date, then id). Optionally limited to one class.
+// ======================================================
+
+export async function loadClassHistory(scope?: string, classKey?: string): Promise<ClassVersion[]> {
+  await ensureHistoryTable();
+  const rows = scope && classKey
+    ? await query<Record<string, unknown>>(`SELECT * FROM asset_class_fact_table WHERE scope=$1 AND "classKey"=$2 ORDER BY "effectiveFrom" ASC, id ASC`, [scope, classKey])
+    : await query<Record<string, unknown>>(`SELECT * FROM asset_class_fact_table ORDER BY "effectiveFrom" ASC, id ASC`);
+  return rows.map(toVersion);
+}
+
+// ======================================================
+// END: Asset class change history
 // ======================================================
 
 // ======================================================

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hydrate, queueFlush, registerSnapshotSource, flushNow } from '../db/repo.js';
-import { ensureSchedules, inServiceDate, recoveryYears } from '../services/schedule-builder.js';
+import { buildSchedule, ensureSchedules, inServiceDate, recoveryYears } from '../services/schedule-builder.js';
 import type {
   Asset,
   DepreciationScheduleRow,
@@ -602,6 +602,43 @@ function inferAssetClass(fields: Record<string, string | number | boolean>): str
 // ======================================================
 
 // ======================================================
+// Function : refreshStoredSchedule
+// Purpose  : Rebuilds the asset's STORED depreciation schedule after an event
+//            that changes its cost or recovery terms (Addition, Adjustment,
+//            Transfer, Reinstatement, Reclassification).
+//            Why: every book reads this one asset record. Books that have a
+//            Customize Table rule rebuild their own schedule from the asset's
+//            current cost, but Federal Tax - and every book without a rule,
+//            which mirrors Federal Tax - read the STORED schedule. Without this
+//            refresh an Adjustment changed some books and left the rest on the
+//            old cost. Now all books move together.
+// ======================================================
+
+function refreshStoredSchedule(
+  asset: Asset,
+  eventType: LifecycleEventType,
+  fields: Record<string, string | number | boolean>
+): void {
+  // Make sure the fact pattern exists first (it supplies the in-service date).
+  ensureTaxFactPatterns([asset], depreciationSchedules);
+
+  // Reclassification: carry the NEW method / life / convention into the fact
+  // pattern so the rebuilt schedule follows them.
+  if (eventType === 'Reclassification' && asset.taxFactPattern) {
+    const months = Number(fields.newLifeMonths);
+    if (typeof fields.newMethod === 'string' && fields.newMethod) asset.taxFactPattern.method = fields.newMethod;
+    if (Number.isFinite(months) && months > 0) {
+      const years = months / 12;
+      asset.taxFactPattern.recoveryPeriod = `${Number.isInteger(years) ? years : years.toFixed(1)} years`;
+    }
+    if (typeof fields.newConvention === 'string' && fields.newConvention) asset.taxFactPattern.convention = fields.newConvention;
+  }
+
+  const rebuilt = buildSchedule(asset);
+  if (rebuilt.length > 0) depreciationSchedules[asset.assetNumber] = rebuilt;
+}
+
+// ======================================================
 // Function : applyLifecycleEvent
 // Purpose  : Applies a posted lifecycle event (addition, adjustment, transfer, etc.) to the in-memory asset and its timeline.
 // ======================================================
@@ -715,6 +752,11 @@ export function applyLifecycleEvent(
 
     default:
       asset = existing ?? createPlaceholder(assetNumber);
+  }
+
+  // Cost / terms changed -> every book (Federal Tax and all the mirror books) must see it.
+  if (['Addition', 'Adjustment', 'Transfer', 'Reinstatement', 'Reclassification'].includes(eventType)) {
+    refreshStoredSchedule(asset, eventType, fields);
   }
 
   pushTimelineEntry(assetNumber, eventType, preview);

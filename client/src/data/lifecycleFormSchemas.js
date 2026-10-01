@@ -88,7 +88,7 @@ export const FIELD_SCHEMAS = {
     { key: 'rateTable', label: 'Rate Table', type: 'select', options: RATE_TABLE_OPTIONS },
     { key: 'convention', label: 'Convention', type: 'select', options: ['HY (Half-Year)', 'MQ (Mid-Quarter)', 'Mid-Month', 'Full-Month'] },
     { key: 'quarter', label: 'Quarter Placed in Service', type: 'select', options: QUARTER_OPTIONS },
-    { key: 'bonusPct', label: 'Bonus %', type: 'number', hint: 'Auto-assigned from PIS/Type' },
+    { key: 'bonusPct', label: 'Bonus %', type: 'number', hint: 'Auto-filled from the selected Asset Class (Bonus % column); editable' },
     { key: 'electOutBonus', label: 'Elect Out Bonus', type: 'checkbox' },
     { key: 'accountingPeriodDate', label: 'Accounting Period Date', type: 'date' }
   ],

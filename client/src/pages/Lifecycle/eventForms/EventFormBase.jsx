@@ -15,12 +15,15 @@
 //             active — this component only receives it as props.
 // ======================================================
 
+import { useEffect, useRef } from 'react';
 import { Pill } from '../../../components/ui/ui';
 import { Button } from '../../../components/ui/Button';
 import { Input, Select } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { EmptyState } from '../../../components/common/EmptyState';
-import { useAssetClassRows, useAssetClasses, lifeToMonths, conventionToOption } from '../../../hooks/useAssetClasses';
+import { bonusPctForDate } from '../../../data/bonusDepreciation';
+import { QUARTER_OPTIONS } from '../../../data/lifecycleFormSchemas';
+import { useAssetClassRows, useAssetClasses, useAssetClassHistory, resolveClassVersion, lifeToMonths, conventionToOption } from '../../../hooks/useAssetClasses';
 
 // ======================================================
 // START: Component Functions
@@ -54,6 +57,7 @@ export function EventFormBase({
 }) {
     const assetClassNames = useAssetClasses();
     const assetClassRows = useAssetClassRows();
+    const classHistory = useAssetClassHistory();
     // Picking an Asset Class fills Property Type / Method / Rate % /
     // Convention / Life straight from that row of the asset_classes table.
     function handleAssetClassChange(name) {
@@ -62,12 +66,51 @@ export function EventFormBase({
         setField('propertyType', row?.propertyType ?? '');
         setField('method', row?.method ?? '');
         setField('ratePct', row?.ratePct ?? '');
+        // Bonus % comes straight from the picked row (Default or Customize table);
+        // a row with no bonus stored leaves whatever is already in the field.
+        if (row && row.bonusPct !== undefined && row.bonusPct !== '') setField('bonusPct', String(row.bonusPct));
         if (!row) return;
         const months = lifeToMonths(row.life);
         if (months !== null) setField('lifeMonths', String(months));
         const conv = conventionToOption(row.convention);
         if (conv) setField('convention', conv);
     }
+    // Addition card only (it is the one with an Asset Class field): once the
+    // Asset Class and Placed-In-Service Date are set, fill Bonus %, Quarter and
+    // Accounting Period Date from them. Bonus % = the class row's own Bonus %
+    // if it has one ("No Bonus" classes = 0), else the IRC 168(k) rate for the
+    // PIS date. Everything stays editable; it re-fills when class or date changes.
+    const hasClassField = schema.some((fld) => fld.optionsSource === 'assetClasses');
+    const pis = formData.placedInService;
+    const lastAutoAcctDate = useRef('');
+    useEffect(() => {
+        if (!hasClassField) return;
+        const current = assetClassRows.find((r) => r.name === formData.assetClass);
+        // The class values that were valid on this PIS date (an edit made later never
+        // changes what an older placed-in-service date gets).
+        const row = current ? resolveClassVersion(current, classHistory, pis) : null;
+        if (current && row !== current) {
+            setField('propertyType', row.propertyType ?? '');
+            setField('method', row.method ?? '');
+            setField('ratePct', row.ratePct ?? '');
+            const months = lifeToMonths(row.life);
+            if (months !== null) setField('lifeMonths', String(months));
+            const conv = conventionToOption(row.convention);
+            if (conv) setField('convention', conv);
+        }
+        const rowBonus = row && row.bonusPct !== undefined && row.bonusPct !== '' ? Number(row.bonusPct) : null;
+        const bonus = /no bonus/i.test(formData.assetClass || '') ? 0 : (rowBonus ?? bonusPctForDate(pis));
+        if (bonus !== null && Number.isFinite(bonus)) setField('bonusPct', String(bonus));
+        if (/^\d{4}-\d{2}-\d{2}$/.test(pis || '')) {
+            const q = Math.floor((Number(pis.slice(5, 7)) - 1) / 3);
+            setField('quarter', QUARTER_OPTIONS[q]);
+            if (!formData.accountingPeriodDate || formData.accountingPeriodDate === lastAutoAcctDate.current) {
+                lastAutoAcctDate.current = pis;
+                setField('accountingPeriodDate', pis);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData.assetClass, pis, assetClassRows, classHistory]);
     return (<>
       <div className="grid grid-2">
         <div className="card card-pad">

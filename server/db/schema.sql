@@ -132,7 +132,8 @@ CREATE TABLE IF NOT EXISTS asset_classes
     method          TEXT NOT NULL,
     "ratePct"       TEXT NOT NULL,
     convention      TEXT NOT NULL,
-    life            TEXT NOT NULL
+    life            TEXT NOT NULL,
+    "bonusPct"      TEXT NOT NULL DEFAULT ''
 );
 
 -- ---------- Configuration -> Asset Classes -> "Customize Table" ----------
@@ -147,7 +148,8 @@ CREATE TABLE IF NOT EXISTS asset_class_custom_table
     method          TEXT NOT NULL,
     "ratePct"       TEXT NOT NULL,
     convention      TEXT NOT NULL,
-    life            TEXT NOT NULL
+    life            TEXT NOT NULL,
+    "bonusPct"      TEXT NOT NULL DEFAULT ''
 );
 
 -- Marker: the 3 starter rows above are inserted once; this records it so
@@ -156,6 +158,38 @@ CREATE TABLE IF NOT EXISTS asset_class_custom_seeded
 (
     done BOOLEAN NOT NULL
 );
+
+-- ---------- Configuration -> Asset Classes: FACT TABLE ----------
+-- One row per version of a Default/Customize row (see db/repo.ts). Append-only:
+-- the triggers below reject UPDATE / DELETE / TRUNCATE, so history never changes.
+CREATE TABLE IF NOT EXISTS asset_class_fact_table
+(
+    id               SERIAL PRIMARY KEY,
+    scope            TEXT NOT NULL,
+    "classKey"       TEXT NOT NULL,
+    name             TEXT NOT NULL DEFAULT '',
+    book             TEXT NOT NULL DEFAULT '',
+    "effectiveFrom"  DATE NOT NULL,
+    "changedAt"      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    "changedBy"      TEXT NOT NULL DEFAULT '',
+    "propertyType"   TEXT NOT NULL DEFAULT '',
+    method           TEXT NOT NULL DEFAULT '',
+    "ratePct"        TEXT NOT NULL DEFAULT '',
+    convention       TEXT NOT NULL DEFAULT '',
+    life             TEXT NOT NULL DEFAULT '',
+    "bonusPct"       TEXT NOT NULL DEFAULT '',
+    changes          TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE OR REPLACE FUNCTION asset_class_fact_table_locked() RETURNS trigger AS $f$
+BEGIN RAISE EXCEPTION 'asset_class_fact_table is append-only: rows cannot be changed or deleted'; END;
+$f$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS asset_class_fact_table_no_change ON asset_class_fact_table;
+CREATE TRIGGER asset_class_fact_table_no_change BEFORE UPDATE OR DELETE ON asset_class_fact_table
+  FOR EACH ROW EXECUTE FUNCTION asset_class_fact_table_locked();
+DROP TRIGGER IF EXISTS asset_class_fact_table_no_truncate ON asset_class_fact_table;
+CREATE TRIGGER asset_class_fact_table_no_truncate BEFORE TRUNCATE ON asset_class_fact_table
+  FOR EACH STATEMENT EXECUTE FUNCTION asset_class_fact_table_locked();
 
 -- ---------- activity.ts : dashboardSummary (single-row snapshot table) ----------
 CREATE TABLE IF NOT EXISTS dashboard_summary

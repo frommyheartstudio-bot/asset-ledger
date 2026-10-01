@@ -20,33 +20,35 @@ export interface AssetClassSeedRow {
   ratePct: string;
   convention: string;
   life: string;
+  /** Bonus % filled into the Addition form when this class is picked ("" = none stored). */
+  bonusPct?: string;
 }
 
 export const ASSET_CLASS_SEED: AssetClassSeedRow[] = [
-  { name: "0.11", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
+  { name: "00.11", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
   { name: "00.11 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "10 years 0 months" },
   { name: "00.11 - PRE TCJA", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
   { name: "00.11 - WBC", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
-  { name: "0.12", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.12", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.12 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.12 - PRE TCJA", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.12 - WBC", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
-  { name: "0.13", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.13", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.13 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "6 years 0 months" },
-  { name: "0.22", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.22", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.22 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
-  { name: "0.241", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.241", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.241 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.241 - WBC", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
-  { name: "0.242", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.242", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.242 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "6 years 0 months" },
   { name: "00.242 - WBC", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
-  { name: "0.25", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
+  { name: "00.25", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "7 years 0 months" },
   { name: "00.25 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "15 years 0 months" },
-  { name: "0.27", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
+  { name: "00.27", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
   { name: "00.27 - ADS", propertyType: "PP - Personal Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "6 years 0 months" },
   { name: "00.27 - WBC", propertyType: "PP - Personal Property", method: "MC - MACRS", ratePct: "200", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "5 years 0 months" },
-  { name: "0.3", propertyType: "RP - Real Property", method: "MC - MACRS", ratePct: "150", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "15 years 0 months" },
+  { name: "00.3", propertyType: "RP - Real Property", method: "MC - MACRS", ratePct: "150", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "15 years 0 months" },
   { name: "00.3 - ADS", propertyType: "RP - Real Property", method: "AD - MACRS ADS", ratePct: "100", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "20 years 0 months" },
   { name: "00.3 - PRE TCJA", propertyType: "RP - Real Property", method: "MC - MACRS", ratePct: "150", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "15 years 0 months" },
   { name: "00.3 - WBC", propertyType: "RP - Real Property", method: "MC - MACRS", ratePct: "150", convention: "AHY - Apply Mid-Quarter test (use HY)", life: "15 years 0 months" },
