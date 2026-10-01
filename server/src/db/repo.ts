@@ -918,6 +918,9 @@ function ensureHistoryTable(): Promise<void> {
          changes          TEXT NOT NULL DEFAULT '[]'
        )`
     ).then(async () => {
+      // The carry-over and the append-only triggers are extras: if the database refuses either,
+      // log it and keep going so the Fact Table itself still loads and records.
+      try {
       // Earlier builds called this table asset_class_history: copy its rows over once.
       const old = await query<Record<string, unknown>>(`SELECT to_regclass('asset_class_history') AS t`);
       if (old[0]?.t) {
@@ -942,6 +945,9 @@ function ensureHistoryTable(): Promise<void> {
          CREATE TRIGGER asset_class_fact_table_no_truncate BEFORE TRUNCATE ON asset_class_fact_table
            FOR EACH STATEMENT EXECUTE FUNCTION asset_class_fact_table_locked();`
       );
+      } catch (err) {
+        console.error('[fact-table] carry-over / append-only triggers not installed:', err instanceof Error ? err.message : err);
+      }
     }).then(() => undefined).catch((err) => { historyTableReady = null; throw err; });
   }
   return historyTableReady;

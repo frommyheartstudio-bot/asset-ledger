@@ -60,7 +60,7 @@ function fetchOnce(kind) {
     if (kind === 'custom') {
         // Customize Table = the custom rows first, then the whole default table after them.
         return Promise.all([configApi.getCustomAssetClasses(), configApi.getAssetClasses()])
-            .then(([custom, base]) => check([...custom, ...check(base)]));
+            .then(([custom, base]) => check([...custom.map((r) => ({ ...r, name: r.assetType || r.name })), ...check(base)]));
     }
     return configApi.getAssetClasses().then(check);
 }

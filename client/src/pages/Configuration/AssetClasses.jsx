@@ -60,10 +60,13 @@ const FIELD_LABELS = { name: 'Name', book: 'Book', propertyType: 'Property Type'
 const BASELINE_DATE = '1900-01-01';
 const showVal = (v) => (v === '' || v === undefined || v === null ? '—' : v);
 
+// The class name only - never the book (custom rules carry the book in their own column).
+const classLabel = (row) => (row.book !== undefined && row.assetType ? row.assetType : row.name);
+
 function ClassNameLink({ row, scope, onOpen }) {
     return (<button type="button" className="mono" title="Click to open the Fact Table"
       style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit', textDecoration: 'none', font: 'inherit', textAlign: 'left', whiteSpace: 'nowrap' }}
-      onClick={() => onOpen({ scope, id: row.id, name: row.name, row })}>{row.name}</button>);
+      onClick={() => onOpen({ scope, id: row.id, name: classLabel(row), row })}>{classLabel(row)}</button>);
 }
 
 function ClassHistoryModal({ target, onClose }) {
@@ -78,7 +81,7 @@ function ClassHistoryModal({ target, onClose }) {
         setVersions([]);
         configApi.getClassHistory(target.scope, target.id)
             .then((v) => { if (alive) setVersions(Array.isArray(v) ? v : []); })
-            .catch(() => { if (alive) setError('Could not load the change history.'); })
+            .catch((e) => { if (alive) setError(`Could not load the Fact Table${e && e.message ? ` (${e.message})` : ''}.`); })
             .finally(() => { if (alive) setLoading(false); });
         return () => { alive = false; };
     }, [target]);
