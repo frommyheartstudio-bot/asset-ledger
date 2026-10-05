@@ -8,6 +8,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { BottomNav } from './BottomNav';
+import { ChatWidget } from '../components/chat/ChatWidget';
 import './layout.css';
 
 
@@ -53,6 +54,7 @@ export function AppLayout({ active, title, crumb, children }) {
         <div className="content">{children}</div>
         <Footer />
       </div>
+      <ChatWidget />
       {isMobile && <BottomNav active={active} moreOpen={sidebarOpen} onMoreClick={() => setSidebarOpen((v) => !v)}/>}
     </div>);
 }
