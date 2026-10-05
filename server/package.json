@@ -7,7 +7,7 @@
     "dev": "tsx watch --exclude data-store.json --exclude \"*.log\" --env-file=.env src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "db:schema": "psql \"$DATABASE_URL\" -f db/schema.sql && psql \"$DATABASE_URL\" -f db/schema-core.sql && psql \"$DATABASE_URL\" -f db/schema-transactions.sql",
+    "db:schema": "psql \"$DATABASE_URL\" -f db/schema.sql && psql \"$DATABASE_URL\" -f db/schema-core.sql && psql \"$DATABASE_URL\" -f db/schema-transactions.sql && psql \"$DATABASE_URL\" -f db/schema-books.sql",
     "db:schema:apply": "tsx --env-file=.env scripts/apply-schema.ts",
     "db:migrate": "tsx --env-file=.env scripts/migrate-to-postgres.ts",
     "db:seed:asset-classes": "tsx --env-file=.env scripts/seed-asset-classes.ts",

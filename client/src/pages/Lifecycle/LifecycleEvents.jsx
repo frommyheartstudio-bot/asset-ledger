@@ -373,25 +373,35 @@ function MasterDataSetSection({
     items, total, loading, error, reload, assetSet, toggleAsset, toggleAllVisible, clearSet, assetSetList,
     mode, setMode, oneAsset, setOneAsset
 }) {
+    // assetClassNames lives in LifecycleEvents' scope, so this component must load it itself
+    // (using it without this threw "assetClassNames is not defined" -> blank white page).
+    const assetClassNames = useAssetClasses();
     const pg = usePagination(items);
     return (<>
       <div className="card card-pad mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 style={{ fontSize: 14, margin: 0 }}>1. Choose Mode</h3>
-          <div className="flex gap-2">
-            <button type="button" className={`btn ${mode === 'many' ? 'btn-primary' : 'btn-ghost'} btn-sm`} onClick={() => setMode('many')}>
-              Same Transaction → All Assets
-            </button>
-            <button type="button" className={`btn ${mode === 'one' ? 'btn-primary' : 'btn-ghost'} btn-sm`} onClick={() => setMode('one')}>
-              Multiple Transactions → One Asset
-            </button>
+        <h3 style={{ fontSize: 14, marginBottom: 14 }}>1. Choose Mode</h3>
+        <div className="mode-picker" role="radiogroup" aria-label="Master Data Set mode">
+          <div role="radio" aria-checked={mode === 'many'} tabIndex={0}
+               className={`mode-card ${mode === 'many' ? 'sel' : ''}`}
+               onClick={() => setMode('many')}
+               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('many'); } }}>
+            <span className="mode-radio" aria-hidden="true"/>
+            <div>
+              <h4>Same Transaction → All Assets</h4>
+              <p>Build a set of assets, pick one event type, download a CSV pre-filled with all selected assets, fill in the field values, and post it.</p>
+            </div>
+          </div>
+          <div role="radio" aria-checked={mode === 'one'} tabIndex={0}
+               className={`mode-card ${mode === 'one' ? 'sel' : ''}`}
+               onClick={() => setMode('one')}
+               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('one'); } }}>
+            <span className="mode-radio" aria-hidden="true"/>
+            <div>
+              <h4>Multiple Transactions → One Asset</h4>
+              <p>Pick one asset, download a CSV pre-filled with that asset, set each row’s event type and fields, and post it.</p>
+            </div>
           </div>
         </div>
-        <p className="text-sm text-muted" style={{ margin: 0 }}>
-          {mode === 'many'
-              ? 'Build a set of assets, pick one event type, download a CSV pre-filled with all selected asset(s), fill in the field values, and post it.'
-              : 'Pick one asset, download a CSV pre-filled with that asset, set each row\u2019s event type and fields, and post it.'}
-        </p>
       </div>
 
       {mode === 'many' && (<>
@@ -650,6 +660,7 @@ function OneAssetPanel({
     canPost, assetClass, setAssetClass, company, setCompany, status, setStatus, q, setQ,
     items, total, loading, error, reload, selectedAsset, setSelectedAsset
 }) {
+    const assetClassNames = useAssetClasses();
     const pg = usePagination(items);
     const assetNumber = selectedAsset?.assetNumber ?? '';
     const [fileName, setFileName] = useState('');

@@ -8,7 +8,7 @@ import { assets, depreciationSchedules, ensureTaxFactPatterns, findAsset, persis
 import { computeAssetMonthlyDepreciationForYear } from '../data/activity.js';
 import { ensureSchedules } from '../services/schedule-builder.js';
 import { resolveBook } from '../data/books.js';
-import { primeBookRules, scheduleForBook, viewAssetForBook, viewAssetsForBook } from '../services/book-view.js';
+import { primeBookRules, scheduleForBook, syncBookEntries, viewAssetForBook, viewAssetsForBook } from '../services/book-view.js';
 
 
 // ======================================================
@@ -51,7 +51,8 @@ assetsRouter.get('/', async (req, res) => {
 });
 
 // POST /api/assets — capitalize a new asset (in-memory only, for the Add Asset page).
-assetsRouter.post('/', (req, res) => {
+assetsRouter.post('/', async (req, res) => {
+  await primeBookRules();
   const body = req.body as Partial<(typeof assets)[number]>;
   const assetNumber = (body.assetNumber ?? String(800000000 + Math.floor(Math.random() * 90000000))).trim();
   const cost = body.cost ?? 0;
@@ -75,6 +76,10 @@ assetsRouter.post('/', (req, res) => {
   };
 
   assets.push(newAsset);
+  // Same as a lifecycle Addition: build the Federal schedule + fact pattern, then one stored entry per book.
+  ensureSchedules([newAsset], depreciationSchedules);
+  ensureTaxFactPatterns([newAsset], depreciationSchedules);
+  syncBookEntries([newAsset]);
   persist();
   res.status(201).json(newAsset);
 });

@@ -22,9 +22,9 @@
 //                                           instead of quietly pretending.
 // ======================================================
 
-import type { Asset, DepreciationScheduleRow } from '../types.js';
-import { DEFAULT_BOOK } from '../data/books.js';
-import { depreciationSchedules } from '../data/assets.js';
+import type { Asset, BookEntry, DepreciationScheduleRow } from '../types.js';
+import { BOOKS, DEFAULT_BOOK } from '../data/books.js';
+import { assets as allAssets, bookEntries, depreciationSchedules, persist } from '../data/assets.js';
 import { buildSchedule, inServiceDate, round2, toISODate } from './schedule-builder.js';
 import { loadClassHistory, loadCustomAssetClasses, type ClassVersion, type CustomAssetClassRow } from '../db/repo.js';
 
@@ -65,7 +65,12 @@ let historyByRule = new Map<string, ClassVersion[]>();
 //            so the rules can also be set directly (scripts, checks).
 // ======================================================
 
+let rulesSignature = '';
+
 export function setBookRules(rows: CustomAssetClassRow[]): void {
+  const signature = JSON.stringify(rows.map((r) => [r.id, r.book, r.assetType, r.method, r.ratePct, r.convention, r.life, r.bonusPct]));
+  const changed = signature !== rulesSignature;
+  rulesSignature = signature;
   const next = new Map<string, Map<string, CustomAssetClassRow>>();
   for (const r of rows) {
     const b = r.book.trim().toLowerCase();
@@ -74,6 +79,13 @@ export function setBookRules(rows: CustomAssetClassRow[]): void {
   }
   rulesByBook = next;
   scheduleCache.clear();
+  // A Customize Table rule was added / edited / deleted -> every asset's stored
+  // per-book entries are now out of date. Rebuild and save them in the DB.
+  // (Also runs once after boot, which backfills assets that predate per-book entries.)
+  if (changed && allAssets.length > 0) {
+    syncBookEntries(allAssets);
+    persist();
+  }
 }
 
 // ======================================================
@@ -277,14 +289,15 @@ function buildRuleSchedule(asset: Asset, rule: CustomAssetClassRow): Depreciatio
 // ======================================================
 
 // ======================================================
-// Function : scheduleForBook
-// Purpose  : The depreciation schedule of one asset in one book.
+// Function : liveScheduleForBook
+// Purpose  : The depreciation schedule of one asset in one book, calculated
+//            now (no stored entry involved).
 //            Federal Tax (and any book with no rule for this asset's
 //            class) returns the STORED schedule; a book with a rule
 //            returns a schedule built from it.
 // ======================================================
 
-export function scheduleForBook(asset: Asset, book: string): DepreciationScheduleRow[] {
+function liveScheduleForBook(asset: Asset, book: string): DepreciationScheduleRow[] {
   const stored = depreciationSchedules[asset.assetNumber] ?? [];
   if (book === DEFAULT_BOOK) return stored;
 
@@ -297,6 +310,106 @@ export function scheduleForBook(asset: Asset, book: string): DepreciationSchedul
   const built = buildRuleSchedule(asset, rule);
   scheduleCache.set(key, built);
   return built;
+}
+
+// ======================================================
+// Function : scheduleForBook
+// Purpose  : The depreciation schedule of one asset in one book — read from
+//            that book's STORED entry (asset_book_schedule). If the stored
+//            entry is missing or was built from older inputs (cost, in-service
+//            date, rule changed), it falls back to the live calculation so a
+//            page never shows a stale number.
+// ======================================================
+
+export function scheduleForBook(asset: Asset, book: string): DepreciationScheduleRow[] {
+  if (book === DEFAULT_BOOK) return depreciationSchedules[asset.assetNumber] ?? [];
+  const entry = bookEntries[asset.assetNumber]?.[book];
+  if (entry && entry.sig === signatureFor(asset, book)) return entry.schedule;
+  return liveScheduleForBook(asset, book);
+}
+
+// ======================================================
+// Function : signatureFor
+// Purpose  : Fingerprint of everything a book's entry is built from: cost,
+//            in-service date, the book's rule (or 'mirror'), and the stored
+//            Federal Tax schedule that mirror books copy.
+// ======================================================
+
+function signatureFor(asset: Asset, book: string): string {
+  const stored = depreciationSchedules[asset.assetNumber] ?? [];
+  const storedHash = `${stored.length}:${round2(stored.reduce((t, r) => t + r.depreciation, 0))}`;
+  const pis = toISODate(asset.taxFactPattern?.placedInService);
+  const rule = book === DEFAULT_BOOK ? undefined : ruleFor(book, asset.assetClass, pis);
+  const ruleKey = book === DEFAULT_BOOK ? 'stored' : rule ? [rule.id, rule.method, rule.ratePct, rule.convention, rule.life].join('/') : 'mirror';
+  return [book, asset.assetNumber, asset.cost, pis, ruleKey, storedHash].join('|');
+}
+
+// ======================================================
+// Function : computeBookEntry
+// Purpose  : Builds the stored entry for ONE asset in ONE book.
+//            Federal Tax -> the stored schedule. A book with a Customize
+//            Table rule -> a schedule built from that rule (SL / MACRS / ADS).
+//            A book with no rule -> a copy of Federal Tax's schedule, flagged
+//            'federal-mirror' so it is visible that no book rule exists yet.
+// ======================================================
+
+function computeBookEntry(asset: Asset, book: string): BookEntry {
+  const tfp = asset.taxFactPattern;
+  const pis = toISODate(tfp?.placedInService);
+  const stored = depreciationSchedules[asset.assetNumber] ?? [];
+  const rule = book === DEFAULT_BOOK ? undefined : ruleFor(book, asset.assetClass, pis);
+  const sig = signatureFor(asset, book);
+  const cost = Number(asset.cost) || 0;
+
+  if (!rule) {
+    return {
+      book,
+      ruleSource: book === DEFAULT_BOOK ? 'stored' : 'federal-mirror',
+      ruleName: '',
+      method: tfp?.method ?? asset.method,
+      convention: tfp?.convention ?? '',
+      life: tfp?.recoveryPeriod ?? '',
+      cost,
+      accumDepreciation: asset.accumDepreciation,
+      nbv: asset.nbv,
+      sig,
+      schedule: stored.map((r) => ({ ...r }))
+    };
+  }
+
+  const rows = buildRuleSchedule(asset, rule);
+  const live = asset.status !== 'Retired' && asset.status !== 'Fully Depreciated';
+  const accum = live ? accumulatedToDate(asset, rows) : asset.accumDepreciation;
+  return {
+    book,
+    ruleSource: 'book-rule',
+    ruleName: `${rule.book} - ${rule.assetType}`,
+    method: rule.method,
+    convention: rule.convention,
+    life: rule.life,
+    cost,
+    accumDepreciation: accum,
+    nbv: live ? round2(cost - accum) : asset.nbv,
+    sig,
+    schedule: rows
+  };
+}
+
+// ======================================================
+// Function : syncBookEntries
+// Purpose  : Writes one stored entry for EVERY book (all of BOOKS) for each
+//            given asset into the in-memory store; the caller's persist()
+//            then saves them to asset_book_entry / asset_book_schedule.
+//            Called on Addition (and every event that changes cost / terms),
+//            when a Customize Table rule changes, and after boot.
+// ======================================================
+
+export function syncBookEntries(list: Asset[]): void {
+  for (const asset of list) {
+    const byBook: Record<string, BookEntry> = {};
+    for (const b of BOOKS) byBook[b.name] = computeBookEntry(asset, b.name);
+    bookEntries[asset.assetNumber] = byBook;
+  }
 }
 
 // ======================================================

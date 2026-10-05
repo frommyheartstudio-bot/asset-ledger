@@ -19,7 +19,7 @@
 
 import { pool } from './postgres.js';
 import type { AssetClassSeedRow } from '../data/assetClasses.js';
-import type { Asset, DepreciationScheduleRow, TimelineEntry } from '../types.js';
+import type { Asset, BookEntries, DepreciationScheduleRow, TimelineEntry } from '../types.js';
 
 // ======================================================
 // START: Repository Functions
@@ -29,6 +29,34 @@ export interface CoreSnapshot {
   assets: Asset[];
   timelines: Record<string, TimelineEntry[]>;
   depreciationSchedules: Record<string, DepreciationScheduleRow[]>;
+  /** Per-book stored entries (asset -> book -> entry). Optional so older callers still compile. */
+  bookEntries?: BookEntries;
+}
+
+// ======================================================
+// Function : ensureBookTables
+// Purpose  : Creates the per-book tables if schema-books.sql was never run,
+//            so a fresh deploy can't crash on a missing table.
+// ======================================================
+
+let bookTablesReady = false;
+
+async function ensureBookTables(): Promise<void> {
+  if (bookTablesReady) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS asset_book_entry (
+    "assetNumber" TEXT NOT NULL, book TEXT NOT NULL,
+    "ruleSource" TEXT NOT NULL DEFAULT 'stored', "ruleName" TEXT NOT NULL DEFAULT '',
+    method TEXT NOT NULL DEFAULT '', convention TEXT NOT NULL DEFAULT '', life TEXT NOT NULL DEFAULT '',
+    cost NUMERIC(20,2) NOT NULL DEFAULT 0, "accumDepreciation" NUMERIC(20,2) NOT NULL DEFAULT 0,
+    nbv NUMERIC(20,2) NOT NULL DEFAULT 0, sig TEXT NOT NULL DEFAULT '',
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY ("assetNumber", book))`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS asset_book_schedule (
+    "assetNumber" TEXT NOT NULL, book TEXT NOT NULL, seq INTEGER NOT NULL, year TEXT NOT NULL,
+    "fiscalYear" INTEGER NOT NULL, "openingNbv" NUMERIC(20,2) NOT NULL DEFAULT 0,
+    rate NUMERIC(9,4) NOT NULL DEFAULT 0, depreciation NUMERIC(20,2) NOT NULL DEFAULT 0,
+    "accumDepreciation" NUMERIC(20,2) NOT NULL DEFAULT 0, "closingNbv" NUMERIC(20,2) NOT NULL DEFAULT 0,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY ("assetNumber", book, seq))`);
+  bookTablesReady = true;
 }
 
 // ======================================================
@@ -90,10 +118,13 @@ function orUndef(v: unknown): string | undefined {
 // ======================================================
 
 export async function hydrate(): Promise<CoreSnapshot> {
-  const [assetRows, timelineRows, scheduleRows] = await Promise.all([
+  await ensureBookTables();
+  const [assetRows, timelineRows, scheduleRows, bookRows, bookScheduleRows] = await Promise.all([
     query<Record<string, unknown>>(`SELECT * FROM assets ORDER BY "assetNumber"`),
     query<Record<string, unknown>>(`SELECT * FROM asset_timeline ORDER BY "assetNumber", seq`),
-    query<Record<string, unknown>>(`SELECT * FROM asset_depreciation_schedule ORDER BY "assetNumber", seq`)
+    query<Record<string, unknown>>(`SELECT * FROM asset_depreciation_schedule ORDER BY "assetNumber", seq`),
+    query<Record<string, unknown>>(`SELECT * FROM asset_book_entry ORDER BY "assetNumber", book`),
+    query<Record<string, unknown>>(`SELECT * FROM asset_book_schedule ORDER BY "assetNumber", book, seq`)
   ]);
 
   const assets: Asset[] = assetRows.map((r) => {
@@ -159,7 +190,36 @@ export async function hydrate(): Promise<CoreSnapshot> {
     });
   }
 
-  return { assets, timelines, depreciationSchedules };
+  const bookEntries: BookEntries = {};
+  for (const r of bookRows) {
+    (bookEntries[String(r.assetNumber)] ??= {})[String(r.book)] = {
+      book: String(r.book),
+      ruleSource: String(r.ruleSource ?? 'stored') as BookEntries[string][string]['ruleSource'],
+      ruleName: String(r.ruleName ?? ''),
+      method: String(r.method ?? ''),
+      convention: String(r.convention ?? ''),
+      life: String(r.life ?? ''),
+      cost: n(r.cost),
+      accumDepreciation: n(r.accumDepreciation),
+      nbv: n(r.nbv),
+      sig: String(r.sig ?? ''),
+      schedule: []
+    };
+  }
+  for (const r of bookScheduleRows) {
+    const entry = bookEntries[String(r.assetNumber)]?.[String(r.book)];
+    if (!entry) continue;
+    entry.schedule.push({
+      year: String(r.year ?? ''),
+      openingNbv: n(r.openingNbv),
+      rate: n(r.rate),
+      depreciation: n(r.depreciation),
+      accumDepreciation: n(r.accumDepreciation),
+      closingNbv: n(r.closingNbv)
+    });
+  }
+
+  return { assets, timelines, depreciationSchedules, bookEntries };
 }
 
 // ======================================================
@@ -205,8 +265,9 @@ function toDateOrNull(raw: unknown): string | null {
 // ======================================================
 
 export async function flush(snapshot: CoreSnapshot): Promise<void> {
-  const { assets, timelines, depreciationSchedules } = snapshot;
+  const { assets, timelines, depreciationSchedules, bookEntries = {} } = snapshot;
 
+  await ensureBookTables();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -306,6 +367,32 @@ export async function flush(snapshot: CoreSnapshot): Promise<void> {
             r.closingNbv
           ]
         );
+      }
+    }
+
+    // Per-book entries: every asset has one entry (+ its own schedule) for every book.
+    // Same delete-then-insert per asset so a changed schedule never leaves stale rows.
+    const bookAssets = Object.keys(bookEntries);
+    if (bookAssets.length > 0) {
+      await client.query(`DELETE FROM asset_book_entry WHERE \"assetNumber\" = ANY($1::text[])`, [bookAssets]);
+      await client.query(`DELETE FROM asset_book_schedule WHERE \"assetNumber\" = ANY($1::text[])`, [bookAssets]);
+    }
+    for (const [assetNumber, byBook] of Object.entries(bookEntries)) {
+      for (const [book, e] of Object.entries(byBook)) {
+        await client.query(
+          `INSERT INTO asset_book_entry
+             (\"assetNumber\", book, \"ruleSource\", \"ruleName\", method, convention, life, cost, \"accumDepreciation\", nbv, sig, \"updatedAt\")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())`,
+          [assetNumber, book, e.ruleSource, e.ruleName, e.method, e.convention, e.life, e.cost, e.accumDepreciation, e.nbv, e.sig]
+        );
+        for (const [seq, r] of e.schedule.entries()) {
+          await client.query(
+            `INSERT INTO asset_book_schedule
+               (\"assetNumber\", book, seq, year, \"fiscalYear\", \"openingNbv\", rate, depreciation, \"accumDepreciation\", \"closingNbv\", \"updatedAt\")
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())`,
+            [assetNumber, book, seq, r.year, Number(r.year.match(/(\d{4})/)?.[1] ?? 0), r.openingNbv, r.rate, r.depreciation, r.accumDepreciation, r.closingNbv]
+          );
+        }
       }
     }
 

@@ -77,6 +77,28 @@ export interface DepreciationScheduleRow {
 }
 
 /**
+ * One asset's stored entry in ONE book (GAAP, Federal Tax, DE, ...).
+ * Every Addition writes one of these per book, each with its own schedule.
+ */
+export interface BookEntry {
+  book: string;
+  ruleSource: 'stored' | 'book-rule' | 'federal-mirror';
+  ruleName: string;
+  method: string;
+  convention: string;
+  life: string;
+  cost: number;
+  accumDepreciation: number;
+  nbv: number;
+  /** Fingerprint of the inputs (cost, in-service date, rule, Federal schedule) this entry was built from. */
+  sig: string;
+  schedule: DepreciationScheduleRow[];
+}
+
+/** assetNumber -> book name -> that book's stored entry. */
+export type BookEntries = Record<string, Record<string, BookEntry>>;
+
+/**
  * Each of the 6 lifecycle event cards (Addition, Adjustment, Transfer,
  * Retirement, Reinstatement, Reclassification) has its own box set — see
  * client/src/data/lifecycleFormSchemas.js, ported from the standalone

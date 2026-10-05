@@ -21,7 +21,7 @@ import { pool } from '../src/db/postgres.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const files = ['schema.sql', 'schema-core.sql', 'schema-transactions.sql'];
+const files = ['schema.sql', 'schema-core.sql', 'schema-transactions.sql', 'schema-books.sql'];
 
 // ======================================================
 // Function : splitStatements

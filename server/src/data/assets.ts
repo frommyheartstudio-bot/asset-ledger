@@ -16,8 +16,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hydrate, queueFlush, registerSnapshotSource, flushNow } from '../db/repo.js';
 import { buildSchedule, ensureSchedules, inServiceDate, recoveryYears } from '../services/schedule-builder.js';
+import { syncBookEntries } from '../services/book-view.js';
 import type {
   Asset,
+  BookEntries,
   DepreciationScheduleRow,
   LifecycleEventType,
   LifecyclePreviewResult,
@@ -42,6 +44,7 @@ type StoreShape = {
   assets: Asset[];
   timelines: Record<string, TimelineEntry[]>;
   depreciationSchedules: Record<string, DepreciationScheduleRow[]>;
+  bookEntries?: BookEntries;
 };
 
 // ======================================================
@@ -57,7 +60,7 @@ export function persist(): void {
 
   // Optional local mirror, dev convenience only. Never read back.
   if (process.env.LOCAL_JSON_MIRROR === '1') {
-    const snapshot: StoreShape = { assets, timelines, depreciationSchedules };
+    const snapshot: StoreShape = { assets, timelines, depreciationSchedules, bookEntries };
     try {
       fs.writeFileSync(STORE_PATH, JSON.stringify(snapshot, null, 2), 'utf-8');
     } catch (err) {
@@ -276,8 +279,10 @@ function readJsonSeed(): StoreShape | null {
 export const assets: Asset[] = [];
 export const depreciationSchedules: Record<string, DepreciationScheduleRow[]> = {};
 export const timelines: Record<string, TimelineEntry[]> = {};
+// One stored entry (+ schedule) per asset PER BOOK — asset -> book -> entry.
+export const bookEntries: BookEntries = {};
 
-registerSnapshotSource(() => ({ assets, timelines, depreciationSchedules }));
+registerSnapshotSource(() => ({ assets, timelines, depreciationSchedules, bookEntries }));
 
 // ======================================================
 // Function : replaceContents
@@ -291,6 +296,8 @@ function replaceContents(snapshot: StoreShape): void {
   Object.assign(timelines, snapshot.timelines);
   for (const k of Object.keys(depreciationSchedules)) delete depreciationSchedules[k];
   Object.assign(depreciationSchedules, snapshot.depreciationSchedules);
+  for (const k of Object.keys(bookEntries)) delete bookEntries[k];
+  Object.assign(bookEntries, snapshot.bookEntries ?? {});
 }
 
 // ======================================================
@@ -413,8 +420,11 @@ export async function initStore(): Promise<{ source: string; assetCount: number;
   // ensureSchedules so it can read each asset's own schedule for its
   // current-year rate.
   const tfpBuilt = ensureTaxFactPatterns(assets, depreciationSchedules);
+  // Backfill the per-book entries (all 15 books) for any asset that has none yet.
+  const needBooks = assets.filter((a) => !bookEntries[a.assetNumber]);
+  if (needBooks.length > 0) syncBookEntries(needBooks);
 
-  if (source !== 'postgres' || built.length > 0 || tfpBuilt.length > 0) {
+  if (source !== 'postgres' || needBooks.length > 0 || built.length > 0 || tfpBuilt.length > 0) {
     await flushNow();
   }
 
@@ -758,6 +768,10 @@ export function applyLifecycleEvent(
   if (['Addition', 'Adjustment', 'Transfer', 'Reinstatement', 'Reclassification'].includes(eventType)) {
     refreshStoredSchedule(asset, eventType, fields);
   }
+
+  // Every book gets its own stored entry + schedule for this asset (Addition creates all
+  // of them; later events that change cost / terms rebuild them). Saved by persist() below.
+  syncBookEntries([asset]);
 
   pushTimelineEntry(assetNumber, eventType, preview);
   persist();
