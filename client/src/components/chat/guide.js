@@ -149,3 +149,56 @@ export function findGuide(message) {
   }
   return best;
 }
+
+// ------------------------------------------------------
+// Related follow-up questions: after an answer, the chat shows these as
+// clickable chips. Keys are guide ids (above) or data topics (data-*).
+// ------------------------------------------------------
+const FOLLOW_UPS = {
+  add: ['How to bulk import assets?', 'How to adjust an asset?', 'How to find or export assets?', 'How many assets do we have?'],
+  adjust: ['How to retire an asset?', 'How to transfer an asset?', 'How to reclassify an asset?', 'How to add a new asset?'],
+  retire: ['How to reinstate a retired asset?', 'Show retired assets', 'How to adjust an asset?', 'How to transfer an asset?'],
+  reinstate: ['How to retire an asset?', 'Show retired assets', 'How to adjust an asset?', 'How to add a new asset?'],
+  transfer: ['How to reclassify an asset?', 'How to retire an asset?', 'How to adjust an asset?', 'How to find or export assets?'],
+  reclass: ['How to transfer an asset?', 'How to adjust an asset?', 'What is in Configuration?', 'How to retire an asset?'],
+  bulk: ['How to add a new asset?', 'How to find or export assets?', 'How to adjust an asset?', 'How to retire an asset?'],
+  find: ['How to add a new asset?', 'Show retired assets', 'How many assets do we have?', 'How to bulk import assets?'],
+  reports: ['What is in Configuration?', 'How many assets do we have?', 'What is the net book value?', 'Show me the project map'],
+  config: ['How to add a new asset?', 'Tell me about reports and forecasting', 'Who can access which pages?', 'How to bulk import assets?'],
+  users: ['Show me the project map', 'What is in Configuration?', 'How to add a new asset?', 'How many assets do we have?'],
+  map: ['How to add a new asset?', 'How to retire an asset?', 'How to bulk import assets?', 'Tell me about reports and forecasting'],
+  'data-count': ['What is the net book value?', 'Show retired assets', 'Show fully depreciated assets', 'How to add a new asset?'],
+  'data-retired': ['How to reinstate a retired asset?', 'How many assets do we have?', 'Show fully depreciated assets', 'How to retire an asset?'],
+  'data-status': ['How many assets do we have?', 'Show retired assets', 'What is the net book value?', 'How to find or export assets?'],
+  'data-nbv': ['How many assets do we have?', 'Show retired assets', 'Tell me about reports and forecasting', 'How to adjust an asset?'],
+  'data-asset': ['How to adjust an asset?', 'How to transfer an asset?', 'How to retire an asset?', 'How many assets do we have?'],
+  default: ['How many assets do we have?', 'How to add a new asset?', 'How to retire an asset?', 'Show retired assets']
+};
+
+// Works out which topic a user message belongs to.
+function topicOf(message) {
+  const t = message.toLowerCase();
+  if (isGuideQuestion(t)) { const g = findGuide(t); if (g) return g.id; }
+  if (/^[a-z0-9-]*\d[a-z0-9-]*$/.test(t.trim())) return 'data-asset';
+  if (/retired/.test(t)) return 'data-retired';
+  if (/(fully depreciated|under review|transferred|active)/.test(t)) return 'data-status';
+  if (/(net book|nbv|book value|cost|depreciation)/.test(t)) return 'data-nbv';
+  if (/(how many|total|count|summary|assets)/.test(t)) return 'data-count';
+  return 'default';
+}
+
+// Returns up to 4 related questions for the last thing the user asked,
+// skipping any question already asked in this chat.
+export function relatedQuestions(message, alreadyAsked = []) {
+  const asked = new Set(alreadyAsked.map((q) => q.trim().toLowerCase()));
+  const pool = [...FOLLOW_UPS[topicOf(message)], ...FOLLOW_UPS.default, ...FOLLOW_UPS.add];
+  const out = [];
+  for (const q of pool) {
+    if (!asked.has(q.toLowerCase()) && !out.includes(q)) out.push(q);
+    if (out.length === 4) break;
+  }
+  return out;
+}
+// ======================================================
+// END OF FILE : guide.js
+// ======================================================

@@ -5,7 +5,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { findGuide, isGuideQuestion } from './guide';
+import { findGuide, isGuideQuestion, relatedQuestions } from './guide';
+import { renderRich } from './linkify';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import './chat.css';
@@ -23,14 +24,16 @@ async function answerFromExistingApis(message, assetNumber) {
         const g = findGuide(t);
         if (g) return { text: `${g.title}\n\n${g.text}`, link: g.link };
     }
-    const num = message.match(/\b\d{6,}\b/)?.[0] ?? assetNumber;
+    const bare = message.trim().match(/^[A-Za-z0-9-]*\d[A-Za-z0-9-]*$/)?.[0];
+    const num = message.match(/\b\d{6,}\b/)?.[0] ?? bare ?? assetNumber;
     if (num) {
         const a = await api.get(`/assets/${num}`).catch(() => null);
         if (a && (a.assetNumber || a.asset?.assetNumber)) {
             const x = a.asset || a;
-            return `Asset ${x.assetNumber}: ${x.description}\nClass: ${x.assetClass} | Status: ${x.status}\nCost ${money(x.cost)}, Accumulated depreciation ${money(x.accumDepreciation)}, Net book value ${money(x.nbv)}.`;
+            return `${x.assetNumber} - ${x.description}\nClass: ${x.assetClass} | Status: ${x.status}\nCost ${money(x.cost)}, Accumulated depreciation ${money(x.accumDepreciation)}, Net book value ${money(x.nbv)}.`;
         }
     }
+    if (bare) return `No asset found with number ${bare}. Open the Asset Register to search.`;
     const statuses = ['Retired', 'Fully Depreciated', 'Under Review', 'Transferred', 'Active'];
     const status = statuses.find((st) => t.includes(st.toLowerCase()));
     if (status) {
@@ -65,6 +68,7 @@ function RobotIcon({ size = 30 }) {
 export function ChatWidget() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const goTo = (to) => { navigate(to); setOpen(false); };
     const location = useLocation();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -73,6 +77,10 @@ export function ChatWidget() {
         { role: 'bot', text: "Hi! I'm the Asset Ledger assistant. Ask me anything about your assets." }
     ]);
     const endRef = useRef(null);
+
+    // Starter chips on first open; related chips after every answer.
+    const userMsgs = messages.filter((m) => m.role === 'user').map((m) => m.text);
+    const suggestions = userMsgs.length === 0 ? SUGGESTIONS : relatedQuestions(userMsgs[userMsgs.length - 1], userMsgs);
 
     useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open, busy]);
 
@@ -116,12 +124,13 @@ export function ChatWidget() {
         </div>
         <div className="chat-body">
           {messages.map((m, i) => (<div key={i} className={`chat-msg ${m.role}`}>
-            {m.text}
-            {m.link && (<button className="chat-link" onClick={() => { navigate(m.link.to); setOpen(false); }}>{m.link.label} →</button>)}
+            {m.role === 'bot' ? renderRich(m.text, goTo) : m.text}
+            {m.link && (<button className="chat-link" onClick={() => goTo(m.link.to)}>{m.link.label} →</button>)}
           </div>))}
           {busy && <div className="chat-msg bot chat-typing"><span/><span/><span/></div>}
-          {messages.length === 1 && (<div className="chat-chips">
-            {SUGGESTIONS.map((s) => (<button key={s} onClick={() => send(s)}>{s}</button>))}
+          {/* First open: the 4 starter questions. After any answer: 4 related questions. */}
+          {!busy && messages[messages.length - 1].role === 'bot' && (<div className="chat-chips">
+            {suggestions.map((s) => (<button key={s} onClick={() => send(s)}>{s}</button>))}
           </div>)}
           <div ref={endRef}/>
         </div>
@@ -136,3 +145,6 @@ export function ChatWidget() {
       </button>
     </>);
 }
+// ======================================================
+// END OF FILE : ChatWidget.jsx
+// ======================================================

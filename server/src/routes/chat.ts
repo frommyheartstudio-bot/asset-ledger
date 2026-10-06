@@ -130,13 +130,27 @@ async function askClaude(message: string, history: { role: string; text: string 
 
 async function localAnswer(message: string, assetNumber?: string): Promise<string> {
   const t = message.toLowerCase();
-  const num = message.match(/\b\d{6,}\b/)?.[0] ?? assetNumber;
+  await primeBookRules();
+  const book = resolveBook(undefined);
+  const all = viewAssetsForBook(assets, book);
 
-  if (num && /(detail|info|cost|nbv|value|status|asset)/.test(t)) {
-    const a = findAsset(num) as any;
+  // Any word that contains a digit could be an asset number (009, 0202, 77777779, A-100 ...).
+  const tokens: string[] = [...(message.match(/[A-Za-z0-9-]*\d[A-Za-z0-9-]*/g) ?? [])];
+  if (assetNumber) tokens.push(assetNumber);
+  const bare = /^[A-Za-z0-9-]*\d[A-Za-z0-9-]*$/.test(message.trim()) ? message.trim() : null;
+
+  for (const tok of tokens) {
+    const a = all.find((x) => x.assetNumber.toLowerCase() === tok.toLowerCase());
     if (a) {
-      return `Asset ${a.assetNumber}: ${a.description}\nClass: ${a.assetClass} | Status: ${a.status}\nCost ${money(a.cost)}, Accum. Dep ${money(a.accumDepreciation)}, NBV ${money(a.nbv)}.`;
+      return `${a.assetNumber} - ${a.description}\nClass: ${a.assetClass} | Status: ${a.status}\nCost ${money(a.cost)}, Accum. Dep ${money(a.accumDepreciation)}, NBV ${money(a.nbv)}.`;
     }
+  }
+  if (bare) {
+    const partial = all.filter((x) => x.assetNumber.toLowerCase().includes(bare.toLowerCase()));
+    if (partial.length) {
+      return `${partial.length} asset(s) matching ${bare}:\n` + partial.slice(0, 8).map((x) => `${x.assetNumber} - ${x.description}`).join('\n');
+    }
+    return `No asset found with number ${bare}. Open the Asset Register to search.`;
   }
   if (/(summary|total|how many|count|dashboard|nbv|book value|cost)/.test(t)) {
     const s: any = computeDashboardSummary(resolveBook(undefined));
@@ -145,7 +159,8 @@ async function localAnswer(message: string, assetNumber?: string): Promise<strin
   const status = (['Retired', 'Fully Depreciated', 'Under Review', 'Transferred', 'Active'] as const).find((s) => t.includes(s.toLowerCase()));
   if (status) {
     const list = assets.filter((a) => a.status === status);
-    return `${status} assets: ${list.length}. ` + list.slice(0, 5).map((a) => `${a.assetNumber} (${a.description})`).join(', ');
+    if (!list.length) return `There are no ${status.toLowerCase()} assets.`;
+    return `${list.length} ${status.toLowerCase()} asset(s):\n` + list.slice(0, 6).map((a) => `${a.assetNumber} - ${a.description}`).join('\n');
   }
   return 'I could not find data for that. Try "total assets", "net book value", "retired assets", or type an asset number. (For full AI answers, add ANTHROPIC_API_KEY to server/.env.)';
 }
