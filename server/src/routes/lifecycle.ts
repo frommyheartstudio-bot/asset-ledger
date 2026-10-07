@@ -92,7 +92,7 @@ function additionPreviewError(preview: { badgeText?: string; rows?: Array<{ labe
 //            wherever it's caught (single post vs. a bulk-row loop).
 // ======================================================
 
-class LifecycleValidationError extends Error {
+export class LifecycleValidationError extends Error {
   status: number;
   constructor(message: string, status: number) {
     super(message);
@@ -165,6 +165,30 @@ async function insertLifecycleTransaction(params: {
 }
 
 // ======================================================
+// Function : postLifecycleEvent
+// Purpose  : ONE posting pipeline (validate -> ledger insert -> update the
+//            Asset Register) shared by POST /post and the AI agent's
+//            confirm step, so a manual post and an agent post can never
+//            drift apart. Throws LifecycleValidationError on a bad post.
+// ======================================================
+
+export async function postLifecycleEvent(
+  input: LifecyclePreviewInput,
+  preview: LifecyclePreviewResult,
+  postedBy: string | undefined
+) {
+  await assertAdditionAllowed(input.eventType, input.assetNumber ?? '', preview);
+  await insertLifecycleTransaction({
+    assetNumber: input.assetNumber ?? '',
+    eventType: input.eventType,
+    fields: input.fields,
+    preview,
+    postedBy
+  });
+  return applyLifecycleEvent(input.eventType, (input.assetNumber ?? '').trim(), input.fields, preview);
+}
+
+// ======================================================
 // Function : GET /event-types
 // Purpose  : Route handler for GET /event-types
 // Input    : req (HTTP request)
@@ -208,26 +232,10 @@ lifecycleRouter.post('/post', async (req, res) => {
   }
 
   try {
-    await assertAdditionAllowed(body.eventType, body.assetNumber ?? '', body.preview);
-
-    await insertLifecycleTransaction({
-      assetNumber: body.assetNumber ?? '',
-      eventType: body.eventType,
-      fields: body.fields,
-      preview: body.preview,
-      postedBy: body.postedBy,
-    });
-
-    // Ledger write succeeded — now reflect the same event on the Asset
-    // Register / Asset Detail pages by updating (or creating) the matching
-    // in-memory asset row, using the exact preview numbers the user just
-    // confirmed. This is what makes a Lifecycle post show up back on the
-    // Asset Register immediately, no separate sync step needed.
-    const asset = applyLifecycleEvent(
-      body.eventType,
-      (body.assetNumber ?? '').trim(),
-      body.fields,
-      body.preview
+    const asset = await postLifecycleEvent(
+      { eventType: body.eventType, assetNumber: body.assetNumber ?? '', fields: body.fields },
+      body.preview,
+      body.postedBy
     );
 
     res.json({ posted: true, asset });

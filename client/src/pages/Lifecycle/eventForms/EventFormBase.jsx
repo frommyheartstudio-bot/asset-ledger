@@ -20,6 +20,7 @@ import { Pill } from '../../../components/ui/ui';
 import { Button } from '../../../components/ui/Button';
 import { Input, Select } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
+import { AssetClassFinder } from '../../../components/asset/AssetClassFinder';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { bonusPctForDate } from '../../../data/bonusDepreciation';
 import { QUARTER_OPTIONS } from '../../../data/lifecycleFormSchemas';
@@ -123,6 +124,7 @@ export function EventFormBase({
             onChange={(e) => setAssetNumber(e.target.value)}
           />
           {blockMessage && (<p className="text-sm" style={{ color: 'var(--danger, #dc2626)', fontWeight: 700, margin: '-6px 0 12px' }}>{blockMessage}</p>)}
+          {hasClassField && <AssetClassFinder classNames={assetClassNames} onPick={handleAssetClassChange}/>}
           <div className="form-grid">
             {schema.map((field) => {
                 if (field.type === 'readonly') {

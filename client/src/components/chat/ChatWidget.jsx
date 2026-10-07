@@ -1,6 +1,8 @@
 // ======================================================
 // File Name : ChatWidget.jsx
-// Purpose   : Floating robot button (bottom-right) that opens the AI chat.
+// Purpose   : Floating robot button (bottom-right) that opens the AI agent chat.
+//             When the agent prepares a lifecycle event it shows a preview card;
+//             nothing is posted until the user clicks Confirm.
 // ======================================================
 
 import { useEffect, useRef, useState } from 'react';
@@ -12,6 +14,8 @@ import { api } from '../../api/client';
 import './chat.css';
 
 const SUGGESTIONS = ['How many assets do we have?', 'How to add a new asset?', 'How to retire an asset?', 'Show retired assets'];
+// Starter chips for the AI Agent (second icon).
+const AGENT_SUGGESTIONS = ['Give me a site update', 'Show recent lifecycle activity', 'Forecast the next 3 years', 'Latest bonus depreciation rules (web)'];
 
 
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
@@ -65,45 +69,68 @@ function RobotIcon({ size = 30 }) {
     </svg>);
 }
 
-export function ChatWidget() {
-    const { user } = useAuth();
+// Sparkle icon for the AI Agent launcher (sits beside the robot).
+function AgentIcon({ size = 28 }) {
+    return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M13 4l2.4 6.6L22 13l-6.6 2.4L13 22l-2.4-6.6L4 13l6.6-2.4z" fill="currentColor"/>
+      <path d="M24 17l1.4 3.6L29 22l-3.6 1.4L24 27l-1.4-3.6L19 22l3.6-1.4z" fill="currentColor"/>
+    </svg>);
+}
+
+// variant 'assistant' = the original robot (guide + /api/chat); 'agent' = LLM agent (/api/agent, web search).
+export function ChatWidget({ variant = 'assistant', open, setOpen }) {
+    const isAgent = variant === 'agent';
+    const { user, hasEdit } = useAuth();
+    const canEdit = !!hasEdit?.('lifecycle');
     const navigate = useNavigate();
     const goTo = (to) => { navigate(to); setOpen(false); };
     const location = useLocation();
-    const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState([
-        { role: 'bot', text: "Hi! I'm the Asset Ledger assistant. Ask me anything about your assets." }
+        { role: 'bot', text: isAgent
+            ? "Hi! I'm the AI Agent. I can read everything on this site, prepare lifecycle events for your confirmation, and search the web for outside information."
+            : "Hi! I'm the Asset Ledger assistant. Ask me anything about your assets." }
     ]);
     const endRef = useRef(null);
 
     // Starter chips on first open; related chips after every answer.
     const userMsgs = messages.filter((m) => m.role === 'user').map((m) => m.text);
-    const suggestions = userMsgs.length === 0 ? SUGGESTIONS : relatedQuestions(userMsgs[userMsgs.length - 1], userMsgs);
+    const suggestions = isAgent
+        ? (userMsgs.length === 0 ? AGENT_SUGGESTIONS : [])
+        : (userMsgs.length === 0 ? SUGGESTIONS : relatedQuestions(userMsgs[userMsgs.length - 1], userMsgs));
 
     useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open, busy]);
 
     async function send(text) {
         const message = (text ?? input).trim();
         if (!message || busy) return;
-        const history = messages.slice(1);
+        const history = messages.slice(1).filter((x) => x.text); // preview cards carry no text
         setMessages((m) => [...m, { role: 'user', text: message }]);
         setInput('');
         setBusy(true);
         const assetNumber = location.pathname.match(/^\/assets\/(\d+)/)?.[1];
         // "How do I...?" questions are answered from the built-in guide (exact, instant).
-        const guide = isGuideQuestion(message) ? findGuide(message) : null;
+        const guide = !isAgent && isGuideQuestion(message) ? findGuide(message) : null;
         if (guide) {
             setMessages((m) => [...m, { role: 'bot', text: `${guide.title}\n\n${guide.text}`, link: guide.link }]);
             setBusy(false);
             return;
         }
         try {
-            const res = await api.post('/chat', { message, history, page: location.pathname, role: user?.role, assetNumber });
-            setMessages((m) => [...m, { role: 'bot', text: res.reply }]);
+            const res = await api.post(isAgent ? '/agent' : '/chat', { message, history, page: location.pathname, role: user?.role, assetNumber, canEdit });
+            setMessages((m) => [
+                ...m,
+                { role: 'bot', text: res.reply, sources: res.sources },
+                // One preview card per proposal the agent prepared; nothing is saved yet.
+                ...(res.actions || []).map((action) => ({ role: 'bot', action, state: 'pending' }))
+            ]);
         } catch {
-            // Chat route missing or failing: answer from the existing APIs instead of showing an error.
+            // Agent: no offline fallback (it is LLM-only). Assistant: answer from the existing APIs.
+            if (isAgent) {
+                setMessages((m) => [...m, { role: 'bot', text: "Sorry, I couldn't reach the AI Agent. Please check that the server is running." }]);
+                return;
+            }
             try {
                 const reply = await answerFromExistingApis(message, assetNumber);
                 setMessages((m) => [...m, typeof reply === 'string' ? { role: 'bot', text: reply } : { role: 'bot', ...reply }]);
@@ -115,17 +142,55 @@ export function ChatWidget() {
         }
     }
 
+    function patchCard(id, patch) {
+        setMessages((m) => m.map((x) => (x.action?.id === id ? { ...x, ...patch } : x)));
+    }
+    async function confirmAction(id) {
+        patchCard(id, { state: 'working' });
+        try {
+            const r = await api.post('/chat/confirm', { id, canEdit, postedBy: user?.name });
+            patchCard(id, { state: 'posted', result: r.message });
+        } catch (e) {
+            patchCard(id, { state: 'error', result: e.message });
+        }
+    }
+    async function cancelAction(id) {
+        patchCard(id, { state: 'cancelled' });
+        api.post('/chat/cancel', { id }).catch(() => { });
+    }
+
     return (<>
-      {open && (<div className="chat-panel" role="dialog" aria-label="Assistant chat">
+      {open && (<div className={`chat-panel${isAgent ? ' agent' : ''}`} role="dialog" aria-label={isAgent ? 'AI Agent chat' : 'Assistant chat'}>
         <div className="chat-head">
-          <span className="chat-head-icon"><RobotIcon size={22}/></span>
-          <div className="chat-head-title"><strong>Asset Assistant</strong><small>Online</small></div>
+          <span className="chat-head-icon">{isAgent ? <AgentIcon size={20}/> : <RobotIcon size={22}/>}</span>
+          <div className="chat-head-title"><strong>{isAgent ? 'AI Agent' : 'Asset Assistant'}</strong><small>{isAgent ? 'Online · web search on' : 'Online'}</small></div>
           <button className="chat-close" onClick={() => setOpen(false)} aria-label="Close chat">×</button>
         </div>
         <div className="chat-body">
-          {messages.map((m, i) => (<div key={i} className={`chat-msg ${m.role}`}>
+          {messages.map((m, i) => m.action ? (<div key={i} className="chat-msg bot chat-card">
+            <div className="chat-card-title">{m.action.title}</div>
+            <div className="chat-card-badge">{m.action.badge}</div>
+            <table className="chat-card-rows"><tbody>
+              {m.action.rows.map((r, j) => (<tr key={j} className={r.emphasize ? 'em' : ''}><td>{r.label}</td><td>{r.value}</td></tr>))}
+            </tbody></table>
+            {m.action.note && <div className="chat-card-note">{m.action.note}</div>}
+            {m.action.inputs?.length > 0 && (<details className="chat-card-inputs"><summary>Inputs used ({m.action.inputs.length})</summary>
+              {m.action.inputs.map((x, j) => (<div key={j}><span>{x.label}</span><span>{x.value}</span></div>))}
+            </details>)}
+            {m.state === 'pending' && (<div className="chat-card-actions">
+              <button className="ok" onClick={() => confirmAction(m.action.id)}>Confirm &amp; Post</button>
+              <button onClick={() => cancelAction(m.action.id)}>Cancel</button>
+            </div>)}
+            {m.state === 'working' && <div className="chat-card-status">Posting…</div>}
+            {m.state === 'posted' && <div className="chat-card-status good">✓ {m.result}</div>}
+            {m.state === 'cancelled' && <div className="chat-card-status">Cancelled. Nothing was saved.</div>}
+            {m.state === 'error' && <div className="chat-card-status bad">✗ {m.result}</div>}
+          </div>) : (<div key={i} className={`chat-msg ${m.role}`}>
             {m.role === 'bot' ? renderRich(m.text, goTo) : m.text}
             {m.link && (<button className="chat-link" onClick={() => goTo(m.link.to)}>{m.link.label} →</button>)}
+            {m.sources?.length > 0 && (<div className="chat-sources"><span>From the web:</span>
+              {m.sources.map((x) => (<a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a>))}
+            </div>)}
           </div>))}
           {busy && <div className="chat-msg bot chat-typing"><span/><span/><span/></div>}
           {/* First open: the 4 starter questions. After any answer: 4 related questions. */}
@@ -140,11 +205,21 @@ export function ChatWidget() {
           <button onClick={() => send()} disabled={busy || !input.trim()} aria-label="Send">➤</button>
         </div>
       </div>)}
-      <button className={`chat-fab${open ? ' open' : ''}`} onClick={() => setOpen((v) => !v)} aria-label="Open assistant" title="Ask the assistant">
-        {open ? <span className="chat-fab-x">×</span> : <RobotIcon/>}
+      <button className={`chat-fab${open ? ' open' : ''}${isAgent ? ' agent' : ''}`} onClick={() => setOpen(!open)}
+        aria-label={isAgent ? 'Open AI Agent' : 'Open assistant'} title={isAgent ? 'AI Agent (site + web)' : 'Ask the assistant'}>
+        {open ? <span className="chat-fab-x">×</span> : (isAgent ? <AgentIcon/> : <RobotIcon/>)}
       </button>
     </>);
 }
+// Both launchers side by side; opening one closes the other.
+export function ChatLaunchers() {
+    const [active, setActive] = useState(null);
+    return (<>
+      <ChatWidget variant="assistant" open={active === 'assistant'} setOpen={(v) => setActive(v ? 'assistant' : null)}/>
+      <ChatWidget variant="agent" open={active === 'agent'} setOpen={(v) => setActive(v ? 'agent' : null)}/>
+    </>);
+}
+
 // ======================================================
 // END OF FILE : ChatWidget.jsx
 // ======================================================

@@ -13,6 +13,7 @@ import { api } from './client';
 
 export const configApi = {
     getAssetClasses: () => api.get('/config/asset-classes'),
+    lookupAssetClass: (q) => api.get(`/config/asset-class-lookup?q=${encodeURIComponent(q)}`),
     updateAssetClass: (id, body) => api.put(`/config/asset-classes/${id}`, body),
     deleteAssetClass: (id) => api.del(`/config/asset-classes/${id}`),
     getCustomAssetClasses: () => api.get('/config/asset-classes/custom'),

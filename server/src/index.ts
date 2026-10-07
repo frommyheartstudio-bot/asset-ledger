@@ -11,6 +11,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { forecastingRouter, reportingRouter, usersRouter, configRouter } from './routes/misc.js';
 import { authRouter } from './routes/auth.js';
 import { chatRouter } from './routes/chat.js';
+import { agentRouter } from './routes/agent.js';
 import { lifecycleRouter } from './routes/lifecycle.js';
 import { modelingRouter } from './routes/modeling.js';
 import { initStore, persistNow } from './data/assets.js';
@@ -43,6 +44,7 @@ app.use('/api/config', configRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/agent', agentRouter);
 
 // ======================================================
 // Function : start

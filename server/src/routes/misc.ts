@@ -3,6 +3,7 @@
 // Purpose   : Defines HTTP route handlers for misc
 // ======================================================
 
+import { lookupAssetClass } from '../services/irs-lookup.js';
 import { Router } from 'express';
 import { computeForecast } from '../data/activity.js';
 import { resolveBook } from '../data/books.js';
@@ -199,6 +200,17 @@ export const configRouter = Router();
 // Output   : res (HTTP response, JSON) — array of asset class rows,
 //            in the same order they were supplied in
 // ======================================================
+
+configRouter.get('/asset-class-lookup', async (req, res) => {
+  const q = String(req.query.q ?? '').trim().slice(0, 120);
+  if (q.length < 2) return res.status(400).json({ error: 'Type a short description, e.g. "laptop"' });
+  try {
+    res.json(await lookupAssetClass(q));
+  } catch (err) {
+    console.error('[asset-class-lookup] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Lookup failed' });
+  }
+});
 
 configRouter.get('/asset-classes', async (_req, res) => {
   try {

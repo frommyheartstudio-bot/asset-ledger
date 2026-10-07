@@ -137,7 +137,12 @@ const ACTION_WORDS = /\b(add|create|new|adjust\w*|retire|retirement|dispose|tran
 
 export function isGuideQuestion(message) {
   const t = message.toLowerCase();
-  return HOW_WORDS.test(t) || ACTION_WORDS.test(t);
+  if (HOW_WORDS.test(t)) return true;
+  // A command carrying specifics (asset number, amount, date) or a longer sentence is a TASK
+  // for the AI agent, not a how-to. Without this, "retire asset 009 ..." was answered by the
+  // static guide and never reached the agent.
+  if (/\d/.test(t) || t.trim().split(/\s+/).length > 6) return false;
+  return ACTION_WORDS.test(t);
 }
 
 export function findGuide(message) {
