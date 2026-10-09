@@ -8,6 +8,7 @@ import { calculateScenarioProjection, round2 } from '../services/depreciation.js
 import type { ScenarioInput } from '../types.js';
 import { assets } from '../data/assets.js';
 import { DEFAULT_BOOK, resolveBook } from '../data/books.js';
+import { loadAppSetting, loadModelingScenarios } from '../db/repo.js';
 import { primeBookRules, scheduleForBook } from '../services/book-view.js';
 
 
@@ -17,13 +18,15 @@ import { primeBookRules, scheduleForBook } from '../services/book-view.js';
 
 export const modelingRouter = Router();
 
-const DEFAULT_BASIS = 1_000_000;
+const MODELING_BASIS_KEY = 'modelingBasis';
 
-const DEFAULT_SCENARIOS: ScenarioInput[] = [
-  { label: 'Scenario A — Baseline', method: 'MACRS ADS', bonusPct: 0, recoveryPeriodYears: 5 },
-  { label: 'Scenario B — Bonus', method: 'MACRS 200% DB', bonusPct: 100, recoveryPeriodYears: 5 },
-  { label: 'Scenario C — Elect ADS', method: 'Straight-Line', bonusPct: 0, recoveryPeriodYears: 7 }
-];
+// Default basis + scenarios come from the DB (app_settings 'modelingBasis' + modeling_scenarios).
+async function modelingDefaults(): Promise<{ basis: number; scenarios: ScenarioInput[] }> {
+  const [basisRaw, scenarios] = await Promise.all([loadAppSetting(MODELING_BASIS_KEY), loadModelingScenarios()]);
+  const basis = Number(basisRaw);
+  if (!Number.isFinite(basis) || !scenarios.length) throw new Error('modeling defaults missing - run db/config-tables.sql');
+  return { basis, scenarios: scenarios as ScenarioInput[] };
+}
 
 // ======================================================
 // Function : GET /scenarios
@@ -32,8 +35,13 @@ const DEFAULT_SCENARIOS: ScenarioInput[] = [
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-modelingRouter.get('/scenarios', (_req, res) => {
-  res.json({ basis: DEFAULT_BASIS, scenarios: DEFAULT_SCENARIOS });
+modelingRouter.get('/scenarios', async (_req, res) => {
+  try {
+    res.json(await modelingDefaults());
+  } catch (err) {
+    console.error('[modeling] defaults failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load modeling defaults' });
+  }
 });
 
 // ======================================================
@@ -74,8 +82,9 @@ function baselineFromSchedules(assetNumbers: string[], startYear: number, years:
 modelingRouter.post('/compare', async (req, res) => {
   const book = resolveBook(req.body?.book);
   await primeBookRules();
-  const basis = Number(req.body?.basis ?? DEFAULT_BASIS);
-  const scenarios: ScenarioInput[] = req.body?.scenarios ?? DEFAULT_SCENARIOS;
+  const defaults = await modelingDefaults();
+  const basis = Number(req.body?.basis ?? defaults.basis);
+  const scenarios: ScenarioInput[] = req.body?.scenarios ?? defaults.scenarios;
   const baselineAssetNumbers: string[] = Array.isArray(req.body?.baselineAssetNumbers) ? req.body.baselineAssetNumbers : [];
   const startYear = Number(req.body?.startYear) || new Date().getFullYear();
   const bonusPctByYear: number[] = Array.isArray(req.body?.bonusPctByYear) ? req.body.bonusPctByYear.map(Number) : [];

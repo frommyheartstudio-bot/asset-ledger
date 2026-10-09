@@ -9,14 +9,11 @@ import { computeForecast } from '../data/activity.js';
 import { resolveBook } from '../data/books.js';
 import { primeBookRules } from '../services/book-view.js';
 import { isKnownBook } from '../data/books.js';
-import {
-  generatedReports as seedGeneratedReports,
-  reportCatalog as seedReportCatalog,
-  roles as seedRoles,
-  users as seedUsers
-} from '../data/admin.js';
-import { ASSET_CLASS_SEED } from '../data/assetClasses.js';
-import { createCustomAssetClass, createGeneratedReport, createUser, deleteAssetClass, deleteCustomAssetClass, deleteUser, loadAdmin, loadAssetClasses, loadClassHistory, loadCustomAssetClasses, recordClassChange, recordClassCreated, seedAdminIfEmpty, seedAssetClassesIfEmpty, updateAssetClass, updateCustomAssetClass, updateRolePermissions, updateUser } from '../db/repo.js';
+import { listAssetTypes } from '../services/assetTypeConfig.js';
+import { getFormOptions } from '../services/formOptions.js';
+import { parsePeriodLabel } from '../services/bonusPeriod.js';
+import { bonusPctForDate, getActiveCustomBonusRuleCount, getBonusConfig, matchCustomBonusRule, refreshCustomBonusRules } from '../services/bonusRates.js';
+import { createBonusCustomRule, deleteBonusCustomRule, loadBonusCustomRules, updateBonusCustomRule, createCustomAssetClass, createGeneratedReport, createUser, deleteAssetClass, deleteCustomAssetClass, deleteUser, loadAdmin, loadAssetClasses, loadClassHistory, loadCustomAssetClasses, loadEngineTestCases, recordClassChange, recordClassCreated, loadCompanies, loadPub946Tables, updateAssetClass, updateCustomAssetClass, updateRolePermissions, updateUser } from '../db/repo.js';
 
 // ======================================================
 // Function : adminData
@@ -33,12 +30,6 @@ const ADMIN_TTL_MS = 5000;
 
 async function adminData() {
   if (adminCache && Date.now() - adminCacheAt < ADMIN_TTL_MS) return adminCache;
-  await seedAdminIfEmpty({
-    roles: seedRoles,
-    users: seedUsers as unknown as Array<Record<string, unknown>>,
-    reportCatalog: seedReportCatalog as unknown as Array<Record<string, unknown>>,
-    generatedReports: seedGeneratedReports as unknown as Array<Record<string, unknown>>
-  });
   adminCache = await loadAdmin();
   adminCacheAt = Date.now();
   return adminCache;
@@ -55,8 +46,7 @@ const ASSET_CLASSES_TTL_MS = 5000;
 // ======================================================
 // Function : assetClassesData
 // Purpose  : Configuration -> Asset Classes page data, out of Postgres
-//            (bootstrapped from ASSET_CLASS_SEED once, same pattern as
-//            adminData above). Cached briefly since the table rarely
+//            (rows from db/seed-asset-classes.sql). Cached briefly since the table rarely
 //            changes and the page can re-request it often.
 // ======================================================
 
@@ -64,11 +54,10 @@ let assetClassesInflight: Promise<Awaited<ReturnType<typeof loadAssetClasses>>> 
 
 async function assetClassesData() {
   if (assetClassesCache && Date.now() - assetClassesCacheAt < ASSET_CLASSES_TTL_MS) return assetClassesCache;
-  // Several dropdowns can ask at once on first load — share one seed+read.
+  // Several dropdowns can ask at once on first load — share one read.
   if (!assetClassesInflight) {
     assetClassesInflight = (async () => {
-      await seedAssetClassesIfEmpty(ASSET_CLASS_SEED);
-      assetClassesCache = await loadAssetClasses();
+          assetClassesCache = await loadAssetClasses();
       assetClassesCacheAt = Date.now();
       return assetClassesCache;
     })().finally(() => { assetClassesInflight = null; });
@@ -210,6 +199,57 @@ configRouter.get('/asset-class-lookup', async (req, res) => {
     console.error('[asset-class-lookup] failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Lookup failed' });
   }
+});
+
+// Calc-engine regression test cases from Postgres. Optional ?engine=additions|adjustments|disposals|transfers|reinstatements|reclassifications
+configRouter.get('/test-cases', async (req, res) => {
+  try {
+    const engine = typeof req.query.engine === 'string' ? req.query.engine : undefined;
+    res.json(await loadEngineTestCases(engine));
+  } catch (err) {
+    console.error('[test-cases] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load test cases' });
+  }
+});
+
+// Depreciation asset types (code, label, property type, method, convention, rate) straight from Postgres.
+configRouter.get('/asset-types', (_req, res) => {
+  res.json(listAssetTypes());
+});
+
+// Dropdown choices for the Lifecycle forms / Asset Register filter (form_option_lists + asset_type_config).
+configRouter.get('/form-options', async (_req, res) => {
+  try {
+    res.json(await getFormOptions());
+  } catch (err) {
+    console.error('[form-options] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load form options' });
+  }
+});
+
+// Company code -> full name (companies table) for the Company pickers.
+configRouter.get('/companies', async (_req, res) => {
+  try {
+    res.json(await loadCompanies());
+  } catch (err) {
+    console.error('[companies] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load companies' });
+  }
+});
+
+// IRS Pub 946 Appendix A percentage tables for Configuration -> Pub 946 Tables (pub946_tables).
+configRouter.get('/pub946-tables', async (_req, res) => {
+  try {
+    res.json(await loadPub946Tables());
+  } catch (err) {
+    console.error('[pub946-tables] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load Pub 946 tables' });
+  }
+});
+
+// Bonus depreciation reference data: timeline rates, date-range rules (for the Bonus % auto-fill) and the rule/exclusion/vehicle-limit tabs.
+configRouter.get('/bonus-rates', (_req, res) => {
+  res.json(getBonusConfig());
 });
 
 configRouter.get('/asset-classes', async (_req, res) => {
@@ -398,6 +438,123 @@ configRouter.put('/asset-classes/custom/:id', async (req, res) => {
 
 // ======================================================
 // END: custom asset classes
+// ======================================================
+
+// ======================================================
+// Function : /bonus-rates/custom  (Bonus Depreciation -> Customize Table)
+// Purpose  : Book-specific bonus rules (Book + placed-in-service date range + Bonus %).
+//            The Default Table (/bonus-rates) is read-only reference data.
+// ======================================================
+
+type BonusCustomFields = { book: string; company: string; assetType: string; year: number; fromMonth: string; toMonth: string; fromDate: string; toDate: string; yearLabel: string; pct: number; lpp: number; law: string; notes: string; highlight: boolean };
+
+// Book / Company / Asset Type may be blank (= applies to all); Year and Bonus % are required.
+function validateBonusCustom(body: unknown): { fields: BonusCustomFields } | { error: string } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const book = str(b.book);
+  if (book && !isKnownBook(book)) return { error: `Unknown book "${book}"` };
+  // Period: From / To as months ('YYYY-MM' = whole month) or exact dates ('YYYY-MM-DD'); blank = open-ended.
+  // A bare year (older clients) means Jan-Dec of that year.
+  const monthRe = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const dateRe = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+  const lastDayOf = (ym: string) => { const [y, mo] = ym.split('-').map(Number); return `${ym}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, '0')}`; };
+  const yearText = typeof b.year === 'number' ? String(b.year) : str(b.year);
+  const bareYear = /^\d{4}$/.test(yearText) && b.fromMonth === undefined && b.toMonth === undefined && b.fromDate === undefined && b.toDate === undefined;
+  let fromDate = bareYear ? `${yearText}-01-01` : str(b.fromDate);
+  let toDate = bareYear ? `${yearText}-12-31` : str(b.toDate);
+  if (!fromDate && str(b.fromMonth)) { if (!monthRe.test(str(b.fromMonth))) return { error: 'From Month must be a month like 2026-01' }; fromDate = `${str(b.fromMonth)}-01`; }
+  if (!toDate && str(b.toMonth)) { if (!monthRe.test(str(b.toMonth))) return { error: 'To Month must be a month like 2026-12' }; toDate = lastDayOf(str(b.toMonth)); }
+  // What is typed in "Year Placed in Service" decides the period (2026, 2027+, 2026–2027, Jan 2026 – Jun 2026 ...).
+  const labelPer = parsePeriodLabel(str(b.yearLabel));
+  if (labelPer) { fromDate = labelPer.fromDate; toDate = labelPer.toDate; }
+  else if (str(b.yearLabel) && !fromDate && !toDate) return { error: 'Year Placed in Service should look like 2026, 2027+, 2026–2027 or Jan 2026 – Jun 2026' };
+  if (!fromDate && !toDate) return { error: 'Enter the Year Placed in Service, e.g. 2026' };
+  if ((fromDate && !dateRe.test(fromDate)) || (toDate && !dateRe.test(toDate)) || (fromDate && Number.isNaN(Date.parse(fromDate))) || (toDate && Number.isNaN(Date.parse(toDate)))) return { error: 'From / To must be valid months or dates' };
+  if (fromDate && toDate && toDate < fromDate) return { error: 'To cannot be before From' };
+  if ((fromDate && (Number(fromDate.slice(0, 4)) < 1980 || Number(fromDate.slice(0, 4)) > 2100)) || (toDate && (Number(toDate.slice(0, 4)) < 1980 || Number(toDate.slice(0, 4)) > 2100))) return { error: 'Dates must be between 1980 and 2100' };
+  const fromMonth = fromDate.slice(0, 7);
+  const toMonth = toDate.slice(0, 7);
+  const year = fromDate ? Number(fromDate.slice(0, 4)) : 0;
+  const pctText = typeof b.pct === 'number' ? String(b.pct) : str(b.pct).replace(/%$/, '');
+  const pct = Number(pctText);
+  if (!pctText || !Number.isFinite(pct) || pct < 0 || pct > 100) return { error: 'Bonus % must be a number from 0 to 100' };
+  // Same extra columns as the Default Table: Longer Production Period % (blank = same as Bonus %), Authority, Notes.
+  const lppText = typeof b.lpp === 'number' ? String(b.lpp) : str(b.lpp).replace(/%$/, '');
+  const lpp = lppText === '' ? pct : Number(lppText);
+  if (!Number.isFinite(lpp) || lpp < 0 || lpp > 100) return { error: 'Longer Production Period % must be a number from 0 to 100' };
+  return { fields: { book, company: str(b.company), assetType: str(b.assetType), year, fromMonth, toMonth, fromDate, toDate,
+    yearLabel: str(b.yearLabel), pct, lpp, law: str(b.law), notes: str(b.notes), highlight: b.highlight === true } };
+}
+
+// Same Book / Company / Asset Type and overlapping month ranges = conflict.
+const sameBonusScope = (a: BonusCustomFields, r: BonusCustomFields) => a.book === r.book && a.company === r.company && a.assetType === r.assetType && (a.fromDate || '0000-01-01') <= (r.toDate || '9999-12-31') && (r.fromDate || '0000-01-01') <= (a.toDate || '9999-12-31');
+
+// Bonus % for one asset: Customize Table rule first, else the Default Table date rule.
+configRouter.get('/bonus-rates/resolve', async (req, res) => {
+  const q = req.query as Record<string, unknown>;
+  const date = str(q.date);
+  let loadError = '';
+  try { await refreshCustomBonusRules(); } catch (err) { loadError = err instanceof Error ? err.message : 'could not read the Customize Table'; console.error('[bonus-rates/resolve]', loadError); } // judge on the latest saved rows
+  const rule = matchCustomBonusRule({ book: str(q.book), company: str(q.company), assetType: str(q.assetType), date });
+  if (rule) return res.json({ pct: rule.pct, source: 'custom', rule: { book: rule.book, company: rule.company, assetType: rule.assetType, yearLabel: rule.yearLabel } });
+  res.json({ pct: bonusPctForDate(date), source: 'default', checked: { book: str(q.book), company: str(q.company), assetType: str(q.assetType), date, activeRows: getActiveCustomBonusRuleCount(), loadError } });
+});
+
+configRouter.get('/bonus-rates/custom', async (_req, res) => {
+  try {
+    res.json(await loadBonusCustomRules());
+  } catch (err) {
+    console.error('[bonus-rates/custom] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not load the customize table' });
+  }
+});
+
+configRouter.post('/bonus-rates/custom', async (req, res) => {
+  try {
+    const v = validateBonusCustom(req.body);
+    if ('error' in v) return res.status(400).json({ error: v.error });
+    if ((await loadBonusCustomRules()).some((r) => r.active && sameBonusScope(r, v.fields))) return res.status(409).json({ error: 'A rule for this Book / Company / Asset Type already covers some of these dates - edit it instead' });
+    const created = await createBonusCustomRule(v.fields);
+    await refreshCustomBonusRules();
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('[bonus-rates/custom POST] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not add the rule' });
+  }
+});
+
+configRouter.put('/bonus-rates/custom/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const v = validateBonusCustom(req.body);
+    if ('error' in v) return res.status(400).json({ error: v.error });
+    if ((await loadBonusCustomRules()).some((r) => r.active && r.id !== id && sameBonusScope(r, v.fields))) return res.status(409).json({ error: 'A rule for this Book / Company / Asset Type already covers some of these dates' });
+    const updated = await updateBonusCustomRule(id, v.fields);
+    if (!updated) return res.status(404).json({ error: 'Row not found' });
+    await refreshCustomBonusRules();
+    res.json(updated);
+  } catch (err) {
+    console.error('[bonus-rates/custom PUT] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not save the row' });
+  }
+});
+
+configRouter.delete('/bonus-rates/custom/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    if (!(await deleteBonusCustomRule(id))) return res.status(404).json({ error: 'Row not found' });
+    await refreshCustomBonusRules();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[bonus-rates/custom DELETE] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Could not delete the rule' });
+  }
+});
+
+// ======================================================
+// END: bonus custom rules
 // ======================================================
 
 export const usersRouter = Router();

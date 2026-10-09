@@ -5,7 +5,7 @@
 //             single source of truth for every book so each table's
 //             Book dropdown, the /api/books endpoint and the server-side
 //             book resolution all agree.
-//             Rows mirror the "Books List" sheet (Name, Description,
+//             Rows live ONLY in the Postgres `books` table (db/config-tables.sql). Rows mirror the "Books List" sheet (Name, Description,
 //             Book of Record, Period Close Date, Reporting Month End,
 //             Reporting Year End).
 // ======================================================
@@ -23,28 +23,31 @@ export interface BookDef {
   reportingYearEnd: string;
 }
 
-/** The book every page opens on — the one the app has always shown. */
-export const DEFAULT_BOOK = 'Federal Tax';
+/**
+ * The book every page opens on. The VALUE lives in the DB (app_settings, key DEFAULT_BOOK_KEY);
+ * it is filled in at boot by services/books.ts via setDefaultBook() (live binding - importers see the update).
+ */
+export const DEFAULT_BOOK_KEY = 'defaultBook';
+export let DEFAULT_BOOK = '';
+export function setDefaultBook(name: string): void { DEFAULT_BOOK = name; }
 
-export const BOOKS: BookDef[] = [
-  { name: 'GAAP', description: 'The GAAP Book', bookOfRecord: true, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'Federal Tax', description: 'The Federal Tax - Regular Book', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'Federal Tax - E&P', description: 'Federal Tax - E&P', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'DE', description: 'Copy of Federal Tax', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'IA', description: 'IA desc', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'IL', description: 'IL desc', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'MS', description: 'MS desc', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'NE', description: 'Copy of Federal Tax', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'OK', description: 'Copy of Federal Tax', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'OR', description: 'Copy of Federal Tax', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'State AMT - QIP', description: 'Copy of State No Bonus - AMT', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2020-08-31', reportingYearEnd: '2020-12-31' },
-  { name: 'State No Bonus', description: 'Federal Tax without Bonus', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'State No Bonus - AMT', description: 'Federal Tax without Bonus', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2020-08-31', reportingYearEnd: '2020-12-31' },
-  { name: 'State QIP', description: 'State QIP desc', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' },
-  { name: 'TN', description: 'TN desc', bookOfRecord: false, periodCloseDate: '2017-12-31', reportingMonthEnd: '2018-12-31', reportingYearEnd: '2018-12-31' }
-];
+/**
+ * Live book list. Filled from the books table at boot (services/books.ts) and
+ * refreshed in place, so every importer keeps seeing the current rows.
+ */
+export const BOOKS: BookDef[] = [];
+export const BOOK_NAMES: string[] = [];
 
-export const BOOK_NAMES: string[] = BOOKS.map((b) => b.name);
+// ======================================================
+// Function : replaceBooks
+// Purpose  : Swaps the contents of BOOKS / BOOK_NAMES in place (same array
+//            objects, so existing imports stay valid).
+// ======================================================
+
+export function replaceBooks(rows: BookDef[]): void {
+  BOOKS.splice(0, BOOKS.length, ...rows);
+  BOOK_NAMES.splice(0, BOOK_NAMES.length, ...rows.map((b) => b.name));
+}
 
 // ======================================================
 // Function : resolveBook

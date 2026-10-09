@@ -15,6 +15,14 @@ import { agentRouter } from './routes/agent.js';
 import { lifecycleRouter } from './routes/lifecycle.js';
 import { modelingRouter } from './routes/modeling.js';
 import { initStore, persistNow } from './data/assets.js';
+import { initAssetTypeConfig } from './services/assetTypeConfig.js';
+import { initRateTables } from './services/rateTables.js';
+import { initBooks } from './services/books.js';
+import { initBonusRates } from './services/bonusRates.js';
+import { initFormOptions } from './services/formOptions.js';
+import { initAssetClassLabels } from './services/assetClassLabels.js';
+import { initRecoveryDefaults } from './services/recoveryDefaults.js';
+import { assertSeedData } from './services/bootChecks.js';
 import { pingPostgres } from './db/postgres.js';
 
 
@@ -65,6 +73,23 @@ async function start(): Promise<void> {
     );
     process.exit(1);
   }
+
+  const rateTableCount = await initRateTables();
+  console.log(`[boot] MACRS rate tables loaded from Postgres — ${rateTableCount} tables`);
+
+  const assetTypeCount = await initAssetTypeConfig();
+  console.log(`[boot] asset type config loaded from Postgres — ${assetTypeCount} types`);
+
+  const bookCount = await initBooks();
+  console.log(`[boot] books loaded from Postgres - ${bookCount} books`);
+
+  const bonusRuleCount = await initBonusRates();
+  console.log(`[boot] bonus depreciation rules loaded from Postgres - ${bonusRuleCount} rules`);
+
+  await initFormOptions();
+  await assertSeedData();
+  await initAssetClassLabels();
+  await initRecoveryDefaults();
 
   const { source, assetCount, schedulesBuilt } = await initStore();
   console.log(`[boot] asset book hydrated from ${source} — ${assetCount} assets, ${schedulesBuilt} schedules generated`);

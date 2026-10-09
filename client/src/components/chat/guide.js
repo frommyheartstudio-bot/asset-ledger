@@ -27,8 +27,8 @@ export const GUIDE = [
     title: 'Add a new asset',
     text: `Option 1 (single asset):
 1. Open Asset Register from the left menu.
-2. Click "+ Add Asset" (top right).
-3. Fill in the form and click "Save Asset".
+2. Click "+ Add Asset" (top right) - it opens the Addition form in Lifecycle Events.
+3. Fill in the form, calculate the preview and post it.
 
 Option 2 (as a posted event):
 1. Open Lifecycle Events and choose "Addition".
@@ -36,7 +36,7 @@ Option 2 (as a posted event):
 3. Enter Asset Cost, Placed-In-Service Date and Accounting Period Date, then post.
 
 You need edit access for this. Many assets at once: use Bulk Import.`,
-    link: { label: 'Go to Add Asset', to: '/assets/new' }
+    link: { label: 'Go to Add Asset', to: '/lifecycle?type=addition' }
   },
   {
     id: 'adjust',

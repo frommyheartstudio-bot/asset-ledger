@@ -14,6 +14,7 @@ import { Pill } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { FIELD_SCHEMAS } from '../../data/lifecycleFormSchemas';
+import { useFormOptions } from '../../hooks/useFormOptions';
 import {
     parseCsv,
     buildTemplateCsv,
@@ -52,6 +53,7 @@ const EVENT_TYPES = [
 // ======================================================
 
 export function BulkImport() {
+    useFormOptions();
     const { user, hasEdit } = useAuth();
     const canImport = hasEdit('bulk-import');
     return (<AppLayout active="bulk-import" title="Bulk Import" crumb="Home / Lifecycle Events / Bulk Import">

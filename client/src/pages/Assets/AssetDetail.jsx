@@ -19,7 +19,7 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
 import { useAuth } from '../../context/AuthContext';
 import { BookSelect } from '../../components/ui/BookSelect';
-import { DEFAULT_BOOK, FALLBACK_BOOK_NAMES } from '../../data/books';
+import { getDefaultBook, getBookNames } from '../../hooks/useBooks';
 
 // ======================================================
 // START: Page Component
@@ -51,7 +51,7 @@ export function AssetDetail() {
     const [searchParams] = useSearchParams();
     const [book, setBook] = useState(() => {
         const fromUrl = searchParams.get('book');
-        return fromUrl && FALLBACK_BOOK_NAMES.includes(fromUrl) ? fromUrl : DEFAULT_BOOK;
+        return fromUrl && getBookNames().includes(fromUrl) ? fromUrl : getDefaultBook();
     });
     const [bookLoading, setBookLoading] = useState(false);
     // Latest book/asset, so a months request that finishes after a switch can be ignored.
@@ -201,7 +201,7 @@ export function AssetDetail() {
       {tab === 'Overview' && (<div className="grid grid-2">
           <div className="card">
             <div className="card-head">
-              <h3>{book === DEFAULT_BOOK ? 'Tax Fact Pattern' : 'Book Fact Pattern'}</h3>
+              <h3>{book === getDefaultBook() ? 'Tax Fact Pattern' : 'Book Fact Pattern'}</h3>
               <BookSelect value={book} onChange={setBook} disabled={bookLoading}/>
             </div>
             <div className="card-pad">
@@ -268,10 +268,10 @@ export function AssetDetail() {
               <span className="text-sm text-muted">Projected through life · click a year for the monthly breakdown</span>
             </div>
           </div>
-          {book !== DEFAULT_BOOK && asset.ruleSource === 'federal-mirror' && (<p className="book-note">
+          {book !== getDefaultBook() && asset.ruleSource === 'federal-mirror' && (<p className="book-note">
               No {book}-specific rule for asset class {asset.assetClass || '—'}, so these figures mirror Federal Tax. Add one in Configuration → Asset Classes → Customize Table.
             </p>)}
-          {book !== DEFAULT_BOOK && asset.ruleSource === 'book-rule' && (<p className="book-note">
+          {book !== getDefaultBook() && asset.ruleSource === 'book-rule' && (<p className="book-note">
               Calculated from the {asset.ruleName} rule in Configuration → Asset Classes.
             </p>)}
           {depreciationSchedule.length === 0 ? (<div className="card-pad">

@@ -9,7 +9,7 @@ const PAGES = [
   ['Lifecycle Events', '/lifecycle'],
   ['Bulk Import', '/lifecycle/bulk-import'],
   ['Asset Register', '/assets'],
-  ['Add Asset', '/assets/new'],
+  ['Add Asset', '/lifecycle?type=addition'],
   ['Pub 946 Tables', '/configuration/pub946'],
   ['Bonus Depreciation', '/configuration/bonus-depreciation'],
   ['Asset Classes', '/configuration/asset-classes'],
@@ -26,6 +26,7 @@ const PAGE_RE = PAGES.map(([label]) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$
 // A page name, or an asset number of 6+ digits.
 const TOKEN_RE = new RegExp(`(${PAGE_RE})|\\b(\\d{6,})\\b`, 'g');
 
+const ACTIVE_LINE = /^Active assets\b/i;
 const TOTAL_LINE = /^(Active assets|Gross cost|Net book value|Accumulated depreciation)\b/i;
 const LIST_ITEM = /^([A-Za-z0-9][A-Za-z0-9-]*)( - .*)$/;
 const COUNT_LINE = /^\d+ [a-z ]*asset\(s\):/i;
@@ -35,7 +36,12 @@ function Link({ to, go, children, title }) {
 }
 
 function lineNodes(line, go, key) {
-  // Totals: whole line opens the Dashboard
+  // "Active assets: 10" opens the Asset Register with the same 10 rows
+  // (the dashboard count = every asset that is not Retired).
+  if (ACTIVE_LINE.test(line)) {
+    return <Link key={key} to="/assets?exclude=Retired" go={go} title="Open these assets in the Asset Register">{line}</Link>;
+  }
+  // Other totals: whole line opens the Dashboard
   if (TOTAL_LINE.test(line)) {
     return <Link key={key} to="/" go={go} title="Open Dashboard">{line}</Link>;
   }

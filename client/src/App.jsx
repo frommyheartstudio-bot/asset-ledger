@@ -8,7 +8,6 @@ import { Login } from './pages/Auth/Login';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { AssetRegister } from './pages/Assets/AssetRegister';
 import { AssetDetail } from './pages/Assets/AssetDetail';
-import { AssetForm } from './pages/Assets/AssetForm';
 import { LifecycleEvents } from './pages/Lifecycle/LifecycleEvents';
 import { BulkImport } from './pages/Lifecycle/BulkImport';
 import { Modeling } from './pages/Planning/Modeling';
@@ -40,7 +39,7 @@ export default function App() {
       <Route path="/login" element={<Login />}/>
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}/>
       <Route path="/assets" element={<ProtectedRoute><RequireView menuId="assets"><AssetRegister /></RequireView></ProtectedRoute>}/>
-      <Route path="/assets/new" element={<ProtectedRoute><RequireView menuId="assets" require="edit"><AssetForm /></RequireView></ProtectedRoute>}/>
+      <Route path="/assets/new" element={<Navigate to="/lifecycle?type=addition" replace/>}/>
       <Route path="/assets/:assetNumber" element={<ProtectedRoute><RequireView menuId="detail"><AssetDetail /></RequireView></ProtectedRoute>}/>
       <Route path="/lifecycle" element={<ProtectedRoute><RequireView menuId="lifecycle"><LifecycleEvents /></RequireView></ProtectedRoute>}/>
       <Route path="/lifecycle/bulk-import" element={<ProtectedRoute><RequireView menuId="bulk-import"><BulkImport /></RequireView></ProtectedRoute>}/>

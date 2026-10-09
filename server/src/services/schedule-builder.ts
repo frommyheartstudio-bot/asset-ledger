@@ -21,6 +21,7 @@
 //             what the Lifecycle calculators produce.
 // ======================================================
 
+import { defaultRecoveryYears } from './recoveryDefaults.js';
 import { createRequire } from 'node:module';
 import type { Asset, DepreciationScheduleRow } from '../types.js';
 
@@ -120,14 +121,6 @@ export function inServiceDate(asset: Asset, schedule?: DepreciationScheduleRow[]
 //            Never returns 0, so we can't divide by zero downstream.
 // ======================================================
 
-const CLASS_DEFAULT_LIFE: Record<string, number> = {
-  'Network Equipment': 5,
-  'Machinery': 7,
-  'Vehicles': 5,
-  'Buildings': 39,
-  'Other': 7
-};
-
 export function recoveryYears(asset: Asset): number {
   const raw = asset.taxFactPattern?.recoveryPeriod ?? '';
   const n = Number(String(raw).match(/(\d+(?:\.\d+)?)/)?.[1]);
@@ -135,7 +128,7 @@ export function recoveryYears(asset: Asset): number {
 
   if (/39/.test(asset.method)) return 39;
   if (/27\.5/.test(asset.method)) return 27.5;
-  return CLASS_DEFAULT_LIFE[asset.assetClass] ?? 7;
+  return defaultRecoveryYears(asset.assetClass);
 }
 
 // ======================================================

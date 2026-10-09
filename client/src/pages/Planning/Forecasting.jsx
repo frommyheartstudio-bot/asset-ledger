@@ -12,13 +12,13 @@ import { Button } from '../../components/ui/Button';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { MultiSelect } from '../../components/ui/MultiSelect';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
-import { companyName } from '../../data/companies';
+import { companyName } from '../../utils/companies';
 import { Loader } from '../../components/common/Loader';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 import { BookSelect } from '../../components/ui/BookSelect';
-import { DEFAULT_BOOK } from '../../data/books';
+import { getDefaultBook } from '../../hooks/useBooks';
 
 // ======================================================
 // START: Page Component
@@ -44,7 +44,7 @@ export function Forecasting() {
     // that slice of the book instead of the whole portfolio.
     // One book at a time: every table on this page shows that book's projection.
     // Changing it re-runs the forecast straight away (no Submit needed).
-    const [book, setBook] = useState(DEFAULT_BOOK);
+    const [book, setBook] = useState(getDefaultBook());
     const [companies, setCompanies] = useState([]);
     const assetClassNames = useAssetClasses();
     const ASSET_TYPE_OPTIONS = useMemo(() => assetClassNames.map((c) => ({ value: c, label: c })), [assetClassNames]);

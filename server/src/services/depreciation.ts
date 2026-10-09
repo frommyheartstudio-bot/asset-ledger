@@ -3,6 +3,8 @@
 // Purpose   : Handles business logic for depreciation
 // ======================================================
 
+import { codeForLabel, getEngineAssetConfig, methodForAssetCode } from './assetTypeConfig.js';
+import { bonusPctForDate, customBonusPct } from './bonusRates.js';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -153,51 +155,8 @@ function normConvention(raw: string, style: 'long' | 'short' = 'long'): string {
 // END: normConvention
 // ======================================================
 
-/** Client `assetType` <select> posts the full descriptive label (e.g.
- *  'Personal Property 5yr MACRS 200% DB (GDS)'); the calc-engine files use
- *  the short codes from the reference calculators (e.g. 'GDS-5'). Order
- *  matches ASSET_TYPE_OPTIONS in client/src/data/lifecycleFormSchemas.js
- *  1:1 with additions.js's own ASSET_CONFIG keys. */
-const ASSET_TYPE_LABEL_TO_CODE: Record<string, string> = {
-  'Personal Property 3yr MACRS 200% DB (GDS)': 'GDS-3',
-  'Personal Property 5yr MACRS 200% DB (GDS)': 'GDS-5',
-  'Personal Property 7yr MACRS 200% DB (GDS)': 'GDS-7',
-  'Personal Property 10yr MACRS 200% DB (GDS)': 'GDS-10',
-  'Personal Property 15yr MACRS 150% DB (GDS)': 'GDS-15',
-  'Personal Property 20yr MACRS 150% DB (GDS)': 'GDS-20',
-  'Residential Rental 27.5yr SL Mid-Month (GDS)': 'GDS-27.5',
-  'Nonresidential Real 31.5yr SL Mid-Month (GDS)': 'GDS-31.5',
-  'Nonresidential Real 39yr SL Mid-Month (GDS)': 'GDS-39',
-  'Personal Property 3yr 150% DB (GDS)': 'GDS150-3',
-  'Personal Property 5yr 150% DB (GDS)': 'GDS150-5',
-  'Personal Property 7yr 150% DB (GDS)': 'GDS150-7',
-  'Personal Property 10yr 150% DB (GDS)': 'GDS150-10',
-  'Personal Property 3yr SL (ADS)': 'ADS-3',
-  'Personal Property 5yr SL (ADS)': 'ADS-5',
-  'Personal Property 9yr SL (ADS)': 'ADS-9',
-  'Personal Property 10yr SL (ADS)': 'ADS-10',
-  'Personal Property 12yr SL (ADS)': 'ADS-12',
-  'Personal Property 20yr SL (ADS)': 'ADS-20',
-  'Personal Property 25yr SL (ADS)': 'ADS-25',
-  'Residential Rental 30yr SL Mid-Month (ADS)': 'ADS-30',
-  'Nonresidential Real 40yr SL Mid-Month (ADS)': 'ADS-40',
-  'Personal Property 5yr MACRS (WBC)': 'GDS-5-WBC',
-  'Personal Property 5yr MACRS (UK - 57)': 'GDS-5-UK',
-  'Book Only — No Depreciation': 'NONE'
-};
-
-/** disposals.cjs / adjustments.cjs / reinstatements.cjs need `method`
- *  passed explicitly (unlike additions.cjs, which resolves it internally
- *  from `assetType`) — mirrors additions.js's own ASSET_CONFIG table. */
-const ASSET_METHOD_BY_CODE: Record<string, string> = {
-  'GDS-3': 'MACRS', 'GDS-5': 'MACRS', 'GDS-7': 'MACRS', 'GDS-10': 'MACRS',
-  'GDS-15': 'MACRS', 'GDS-20': 'MACRS',
-  'GDS-27.5': 'MACRS Straight-Line', 'GDS-31.5': 'MACRS Straight-Line', 'GDS-39': 'MACRS Straight-Line',
-  'GDS150-3': 'MACRS 150DB', 'GDS150-5': 'MACRS 150DB', 'GDS150-7': 'MACRS 150DB', 'GDS150-10': 'MACRS 150DB',
-  'ADS-3': 'MACRS ADS', 'ADS-5': 'MACRS ADS', 'ADS-9': 'MACRS ADS', 'ADS-10': 'MACRS ADS',
-  'ADS-12': 'MACRS ADS', 'ADS-20': 'MACRS ADS', 'ADS-25': 'MACRS ADS', 'ADS-30': 'MACRS ADS', 'ADS-40': 'MACRS ADS',
-  'GDS-5-WBC': 'MACRS', 'GDS-5-UK': 'MACRS', 'NONE': 'None'
-};
+/** Asset-type label -> code and code -> method now come from the asset_type_config
+ *  table (Postgres) via services/assetTypeConfig.ts — nothing is hard-coded here. */
 
 // ======================================================
 // Function : assetCode
@@ -206,7 +165,7 @@ const ASSET_METHOD_BY_CODE: Record<string, string> = {
 
 function assetCode(f: Record<string, unknown>, key = 'assetType'): string {
   const label = str(f, key);
-  return ASSET_TYPE_LABEL_TO_CODE[label] || label;
+  return codeForLabel(label);
 }
 
 // ======================================================
@@ -219,7 +178,7 @@ function assetCode(f: Record<string, unknown>, key = 'assetType'): string {
 // ======================================================
 
 function methodForCode(code: string): string {
-  return ASSET_METHOD_BY_CODE[code] || 'MACRS';
+  return methodForAssetCode(code);
 }
 
 // ======================================================
@@ -280,6 +239,23 @@ function errorResult(engineResult: any): LifecyclePreviewResult {
 // END: errorResult
 // ======================================================
 
+// ======================================================
+// Function : bonusPctOrLookup
+// Purpose  : Bonus % as posted; when the field is blank, falls back to the
+//            bonus_depreciation_rules row for the placed-in-service date
+//            (so a client that sends no Bonus % still gets the right rate).
+// ======================================================
+
+function bonusPctOrLookup(f: Record<string, unknown>, pisd: string): number {
+  const raw = f['bonusPct'];
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    // Customize Table (Book / Company / Asset Type / Year) first, then the Default Table date rule.
+    const custom = customBonusPct({ book: str(f, 'book'), company: str(f, 'company'), assetType: str(f, 'assetClass'), date: pisd });
+    return custom ?? bonusPctForDate(pisd) ?? 0;
+  }
+  return num(f, 'bonusPct');
+}
+
 // ── Addition ─────────────────────────────────────────────────────────────
 // ======================================================
 // Function : calcAddition
@@ -296,10 +272,11 @@ function calcAddition(f: Record<string, unknown>): LifecyclePreviewResult {
     pisd,
     accountingPeriodDate,
     lifeMonths: num(f, 'lifeMonths', 60) || 60,
-    bonusPercent: electOut ? 0 : num(f, 'bonusPct'),
+    bonusPercent: electOut ? 0 : bonusPctOrLookup(f, pisd),
     convention: normConvention(str(f, 'convention', 'HY (Half-Year)')),
     quarter: parseQuarter(f['quarter']),
-    assetType: assetCode(f)
+    assetType: assetCode(f),
+    assetConfig: getEngineAssetConfig()
   });
   if (result.error) return errorResult(result);
 

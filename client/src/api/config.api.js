@@ -22,6 +22,15 @@ export const configApi = {
     deleteCustomAssetClass: (id) => api.del(`/config/asset-classes/custom/${id}`),
     getClassHistory: (scope, id) => api.get(`/config/asset-classes/history?scope=${scope}&id=${id}`),
     getAllClassHistory: () => api.get('/config/asset-classes/history'),
+    getFormOptions: () => api.get('/config/form-options'),
+    getBonusRates: () => api.get('/config/bonus-rates'),
+    resolveBonusPct: (p) => api.get(`/config/bonus-rates/resolve?${new URLSearchParams(p).toString()}`),
+    getCustomBonusRules: () => api.get('/config/bonus-rates/custom'),
+    createCustomBonusRule: (body) => api.post('/config/bonus-rates/custom', body),
+    updateCustomBonusRule: (id, body) => api.put(`/config/bonus-rates/custom/${id}`, body),
+    deleteCustomBonusRule: (id) => api.del(`/config/bonus-rates/custom/${id}`),
+    getCompanies: () => api.get('/config/companies'),
+    getPub946Tables: () => api.get('/config/pub946-tables'),
 };
 
 // ======================================================

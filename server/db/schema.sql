@@ -136,6 +136,124 @@ CREATE TABLE IF NOT EXISTS asset_classes
     "bonusPct"      TEXT NOT NULL DEFAULT ''
 );
 
+-- ---------- Depreciation calc-engine: asset type -> property type / method / convention / rate ----------
+-- Replaces the hard-coded ASSET_CONFIG (calc-engine/additions.cjs) and the label->code /
+-- code->method maps (services/depreciation.ts). Edit rows here; the server reloads them at boot
+-- and after every change made through the API. Seeded once from data/assetTypeConfig.ts.
+CREATE TABLE IF NOT EXISTS asset_type_config
+(
+    code            TEXT PRIMARY KEY,
+    label           TEXT NOT NULL UNIQUE,
+    "propertyType"  TEXT NOT NULL,
+    method          TEXT NOT NULL,
+    convention      TEXT NOT NULL,
+    rate            NUMERIC NOT NULL DEFAULT 0,
+    "sortOrder"     INTEGER NOT NULL DEFAULT 0,
+    active          BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- ---------- Books (was hard-coded in data/books.ts) ----------
+-- Seeded once from BOOKS_SEED when empty. "sortOrder" keeps the dropdown order.
+CREATE TABLE IF NOT EXISTS books
+(
+    name                 TEXT PRIMARY KEY,
+    description          TEXT NOT NULL DEFAULT '',
+    "bookOfRecord"       BOOLEAN NOT NULL DEFAULT FALSE,
+    "periodCloseDate"    TEXT NOT NULL DEFAULT '',
+    "reportingMonthEnd"  TEXT NOT NULL DEFAULT '',
+    "reportingYearEnd"   TEXT NOT NULL DEFAULT '',
+    "sortOrder"          INTEGER NOT NULL DEFAULT 0,
+    active               BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- ---------- Bonus depreciation (was client/src/data/bonusDepreciation.js + BonusDepreciation.jsx) ----------
+-- Timeline table shown on Configuration -> Bonus Depreciation.
+CREATE TABLE IF NOT EXISTS bonus_depreciation_rates
+(
+    id           SERIAL PRIMARY KEY,
+    "year"       TEXT NOT NULL,
+    pct          NUMERIC NOT NULL DEFAULT 0,
+    lpp          NUMERIC NOT NULL DEFAULT 0,
+    law          TEXT NOT NULL DEFAULT '',
+    notes        TEXT NOT NULL DEFAULT '',
+    highlight    BOOLEAN NOT NULL DEFAULT FALSE,
+    "sortOrder"  INTEGER NOT NULL DEFAULT 0,
+    active       BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Date-range rules behind the Bonus % auto-fill (placed-in-service date -> pct). NULL end = open range.
+CREATE TABLE IF NOT EXISTS bonus_depreciation_rules
+(
+    id               SERIAL PRIMARY KEY,
+    "effectiveFrom"  DATE,
+    "effectiveTo"    DATE,
+    pct              NUMERIC NOT NULL DEFAULT 0,
+    label            TEXT NOT NULL DEFAULT '',
+    "sortOrder"      INTEGER NOT NULL DEFAULT 0,
+    active           BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Eligibility rules / excluded property / luxury-auto limits tabs. data = the row's columns as JSON.
+CREATE TABLE IF NOT EXISTS bonus_reference_rows
+(
+    id           SERIAL PRIMARY KEY,
+    kind         TEXT NOT NULL,   -- qualifying_rule | excluded_property | vehicle_limit
+    data         JSONB NOT NULL,
+    "sortOrder"  INTEGER NOT NULL DEFAULT 0,
+    active       BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- ---------- Dropdown choices for the Lifecycle forms (was client/src/data/lifecycleFormSchemas.js) ----------
+-- list = rateTable | method | conventionAddition | conventionAdjustment | ... | registerMethodFilter.
+-- (The asset-type list comes from asset_type_config; quarters stay in code.)
+CREATE TABLE IF NOT EXISTS form_option_lists
+(
+    list         TEXT NOT NULL,
+    value        TEXT NOT NULL,
+    "sortOrder"  INTEGER NOT NULL DEFAULT 0,
+    active       BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (list, value)
+);
+
+-- ---------- Calc-engine regression test cases (moved out of calc-engine/*.cjs) ----------
+-- Seeded from db/engine-test-cases.sql. Run them with: npm run test:engine
+CREATE TABLE IF NOT EXISTS engine_test_cases
+(
+    engine            TEXT NOT NULL,
+    "caseId"          TEXT NOT NULL,
+    name              TEXT NOT NULL,
+    inputs            JSONB NOT NULL,
+    "expectedOutputs" JSONB NOT NULL DEFAULT '{}'::jsonb,
+    "sortOrder"       INTEGER NOT NULL DEFAULT 0,
+    active            BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (engine, "caseId")
+);
+
+-- ---------- IRS Pub 946 MACRS percentage tables (moved out of calc-engine/rate-tables.cjs) ----------
+-- Seeded from db/rate-tables.sql. The server loads these at boot (services/rateTables.ts).
+CREATE TABLE IF NOT EXISTS macrs_rate_by_year
+(
+    "tableKey" TEXT NOT NULL,
+    life       INTEGER NOT NULL,
+    year       INTEGER NOT NULL,
+    "ratePct"  NUMERIC NOT NULL,
+    PRIMARY KEY ("tableKey", life, year)
+);
+
+CREATE TABLE IF NOT EXISTS macrs_mm_rate
+(
+    "tableKey"  TEXT NOT NULL,
+    month       INTEGER NOT NULL,
+    "year1Pct"  NUMERIC NOT NULL,
+    "annualPct" NUMERIC NOT NULL,
+    PRIMARY KEY ("tableKey", month)
+);
+
+CREATE TABLE IF NOT EXISTS macrs_ads_lives
+(
+    life INTEGER PRIMARY KEY
+);
+
 -- ---------- Configuration -> Asset Classes -> "Customize Table" ----------
 -- 3 rows (seeded on first read, see db/repo.ts). Name shown in the UI is
 -- "<book> - <assetType>", e.g. "GAAP - Acquisition".

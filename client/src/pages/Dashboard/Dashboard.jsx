@@ -12,7 +12,7 @@ import { Loader } from '../../components/common/Loader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { BookSelect } from '../../components/ui/BookSelect';
-import { DEFAULT_BOOK } from '../../data/books';
+import { getDefaultBook } from '../../hooks/useBooks';
 
 // ======================================================
 // START: Page Component
@@ -35,7 +35,7 @@ export function Dashboard() {
     // Which book every card on this page is showing. Changing it reloads
     // the KPI cards, the Monthly Depreciation chart and Assets by Class
     // with that book's numbers (Federal Tax is what the page always showed).
-    const [book, setBook] = useState(DEFAULT_BOOK);
+    const [book, setBook] = useState(getDefaultBook());
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [fy, setFy] = useState(CURRENT_YEAR);
     // Two six-month halves instead of showing/scrolling through all 12

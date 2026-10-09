@@ -4,11 +4,11 @@
 //             MACRS percentage tables reference (Appendix A-1..A-24)
 // ======================================================
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
-import { PUB946_TABLES } from '../../data/pub946Tables';
+import { configApi } from '../../api/config.api';
 import { downloadCsv } from '../../utils/csv';
 
 // ======================================================
@@ -43,9 +43,19 @@ function exportTableCsv(table) {
 // ======================================================
 
 export function Pub946Tables() {
+    // The tables come from the database (pub946_tables) - nothing is hard-coded in the client.
+    const [tables, setTables] = useState([]);
+    const [loadError, setLoadError] = useState('');
+    useEffect(() => {
+        let alive = true;
+        configApi.getPub946Tables()
+            .then((rows) => { if (alive) setTables(Array.isArray(rows) ? rows : []); })
+            .catch((err) => { if (alive) setLoadError(err instanceof Error ? err.message : 'Could not load Pub 946 tables'); });
+        return () => { alive = false; };
+    }, []);
     const [convention, setConvention] = useState('all');
-    const filteredTables = useMemo(() => PUB946_TABLES.filter((t) => convention === 'all' || t.convention === convention), [convention]);
-    const [selectedId, setSelectedId] = useState(PUB946_TABLES[0].id);
+    const filteredTables = useMemo(() => tables.filter((t) => convention === 'all' || t.convention === convention), [tables, convention]);
+    const [selectedId, setSelectedId] = useState('');
     const table = filteredTables.find((t) => t.id === selectedId) ?? filteredTables[0];
 
     const maxRows = table ? Math.max(...table.data.map((col) => col.length)) : 0;
@@ -81,6 +91,9 @@ export function Pub946Tables() {
           </Button>
         </div>
       </div>
+
+      {loadError && (<p className="text-muted">{loadError}</p>)}
+      {!loadError && tables.length === 0 && (<p className="text-muted">Loading…</p>)}
 
       {table && (<div className="card">
           <div className="card-head">

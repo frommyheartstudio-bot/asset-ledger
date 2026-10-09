@@ -82,175 +82,11 @@ export async function persistNow(): Promise<void> {
 // END: persist
 // ======================================================
 
-// Seed data — used only the first time the app runs (no data-store.json
-// on disk yet). Every run after that loads whatever was last persisted.
-const SEED_ASSETS: Asset[] = [
-  {
-    assetNumber: '845862189',
-    description: 'Network Rack — AWS AFS',
-    assetClass: '00.12', // Information Systems (computers & peripheral equipment)
-    company: '5B',
-    costCenter: '7410',
-    location: '1B51',
-    project: 'N37W',
-    cost: 580463.24,
-    accumDepreciation: 11609.26,
-    nbv: 568853.98,
-    method: 'MACRS ADS',
-    status: 'Active',
-    taxFactPattern: {
-      placedInService: '2026-03-19',
-      recoveryPeriod: '5 years',
-      method: 'MACRS ADS (Straight-Line)',
-      convention: 'Half-Year',
-      bonusPct: 0,
-      annualRate: 20.0,
-      propertyType: 'Personal Property'
-    }
-  },
-  {
-    assetNumber: '846013895',
-    description: 'Data Center HVAC Unit',
-    assetClass: '00.4', // Industrial Steam and Electric Generation/Distribution Systems
-    company: 'B110',
-    cost: 357919,
-    accumDepreciation: 7158,
-    nbv: 350761,
-    method: 'MACRS ADS',
-    status: 'Active'
-  },
-  {
-    assetNumber: '845603468',
-    description: 'Substation Transformer',
-    assetClass: '00.4', // Industrial Steam and Electric Generation/Distribution Systems
-    company: 'QT',
-    cost: 339_300_000,
-    accumDepreciation: 11_300_000,
-    nbv: 328_000_000,
-    method: 'MACRS ADS',
-    status: 'Active'
-  },
-  {
-    assetNumber: '846006799',
-    description: 'Rack PDU Assembly',
-    assetClass: '00.12', // Information Systems (computers & peripheral equipment)
-    company: 'R9',
-    cost: 39694,
-    accumDepreciation: 794,
-    nbv: 38900,
-    method: 'MACRS ADS',
-    status: 'Active'
-  },
-  {
-    assetNumber: '845990931',
-    description: 'Fiber Transceiver Module',
-    assetClass: '00.12', // Information Systems (computers & peripheral equipment)
-    company: '2D',
-    cost: 5710.33,
-    accumDepreciation: 5710.33,
-    nbv: 0,
-    method: 'MACRS',
-    status: 'Fully Depreciated'
-  },
-  {
-    assetNumber: '846321878',
-    description: 'Temporary Test Rig',
-    assetClass: '00.4', // Industrial Steam and Electric Generation/Distribution Systems
-    company: 'B579',
-    cost: 48200,
-    accumDepreciation: 42350,
-    nbv: 5850,
-    method: 'MACRS 200% DB',
-    status: 'Retired',
-    taxFactPattern: {
-      placedInService: '2022-09-01',
-      recoveryPeriod: '5 years',
-      method: 'MACRS 200% DB (GDS)',
-      convention: 'Half-Year',
-      bonusPct: 0,
-      annualRate: 11.52,
-      propertyType: 'Personal Property'
-    },
-    disposal: {
-      disposalDate: '2026-01-31',
-      adAtDisposal: 42350,
-      gainLoss: -1850
-    }
-  },
-  {
-    assetNumber: '845771204',
-    description: 'Legacy Storage Array',
-    assetClass: '00.12', // Information Systems (computers & peripheral equipment)
-    company: '2D',
-    cost: 182400,
-    accumDepreciation: 138600,
-    nbv: 43800,
-    method: 'MACRS ADS',
-    status: 'Retired',
-    taxFactPattern: {
-      placedInService: '2020-11-10',
-      recoveryPeriod: '9 years',
-      method: 'MACRS ADS (Straight-Line)',
-      convention: 'Half-Year',
-      bonusPct: 0,
-      annualRate: 11.11,
-      propertyType: 'Personal Property'
-    },
-    disposal: {
-      disposalDate: '2025-11-30',
-      adAtDisposal: 138600,
-      gainLoss: 4200
-    }
-  },
-  {
-    assetNumber: '845009019',
-    description: 'Cooling Loop Assembly',
-    assetClass: '00.4', // Industrial Steam and Electric Generation/Distribution Systems
-    company: 'GD',
-    cost: -973,
-    accumDepreciation: -162,
-    nbv: -811,
-    method: 'MACRS ADS',
-    status: 'Under Review'
-  },
-  {
-    assetNumber: '844117702',
-    description: 'Warehouse — Building 12',
-    assetClass: '', // TODO: buildings are real property (Sec 1250) — not in the MACRS personal-property class list; needs its own building-depreciation handling, not an asset class code
-    company: '5B',
-    cost: 12_400_000,
-    accumDepreciation: 2_100_000,
-    nbv: 10_300_000,
-    method: 'SL Mid-Month',
-    status: 'Active'
-  }
-];
-
-const SEED_DEPRECIATION_SCHEDULES: Record<string, DepreciationScheduleRow[]> = {
-  '845862189': [
-    { year: '2026 (Yr 1)', openingNbv: 580463, rate: 10.0, depreciation: 58046, accumDepreciation: 58046, closingNbv: 522417 },
-    { year: '2027 (Yr 2)', openingNbv: 522417, rate: 20.0, depreciation: 116093, accumDepreciation: 174139, closingNbv: 406324 },
-    { year: '2028 (Yr 3)', openingNbv: 406324, rate: 20.0, depreciation: 116093, accumDepreciation: 290232, closingNbv: 290232 },
-    { year: '2029 (Yr 4)', openingNbv: 290232, rate: 20.0, depreciation: 116093, accumDepreciation: 406324, closingNbv: 174139 },
-    { year: '2030 (Yr 5)', openingNbv: 174139, rate: 20.0, depreciation: 116093, accumDepreciation: 522417, closingNbv: 58046 },
-    { year: '2031 (Yr 6)', openingNbv: 58046, rate: 10.0, depreciation: 58046, accumDepreciation: 580463, closingNbv: 0 }
-  ]
-};
-
-const SEED_TIMELINES: Record<string, TimelineEntry[]> = {
-  '845862189': [
-    { date: 'MAR 19, 2026', title: 'Addition — $579,580.98', description: 'Asset capitalized and placed in service', done: true },
-    { date: 'APR 21, 2026', title: 'Adjustment — +$882.26', description: 'Cost basis adjustment · revision absorbed $8.82', done: true },
-    { date: 'UPCOMING', title: 'Monthly Depreciation', description: 'Next charge scheduled May 31, 2026', done: false }
-  ]
-};
-
 // ======================================================
 // Function : readJsonSeed
 // Purpose  : One-time bootstrap only. If ClickHouse comes back empty on
 //            first boot, prefer an existing data-store.json (a prior
-//            session's real work) over the hardcoded SEED_* constants,
-//            so nobody loses data when switching the store over.
+//            session's real work), so nobody loses data when switching the store over.
 // ======================================================
 
 function readJsonSeed(): StoreShape | null {
@@ -384,8 +220,7 @@ export function ensureTaxFactPatterns(
 // ======================================================
 // Function : initStore
 // Purpose  : Boot-time hydration. Postgres first; if it has no assets
-//            yet, bootstrap it from data-store.json (or the SEED_*
-//            constants) and write that straight back so Postgres
+//            yet, bootstrap it from data-store.json  and write that straight back so Postgres
 //            becomes authoritative from the very first run.
 //            Throws if Postgres is unreachable — the app must NOT
 //            quietly fall back to a JSON file and pretend it has a
@@ -401,14 +236,10 @@ export async function initStore(): Promise<{ source: string; assetCount: number;
     source = 'postgres';
   } else {
     const jsonSeed = readJsonSeed();
-    replaceContents(
-      jsonSeed ?? {
-        assets: SEED_ASSETS,
-        timelines: SEED_TIMELINES,
-        depreciationSchedules: SEED_DEPRECIATION_SCHEDULES
-      }
-    );
-    source = jsonSeed ? 'bootstrap:data-store.json' : 'bootstrap:seed';
+    // Nothing hard-coded: with no DB rows and no JSON file the register starts empty.
+    // Load sample/real assets with: npm run db:seed:assets
+    replaceContents(jsonSeed ?? { assets: [], timelines: {}, depreciationSchedules: {} });
+    source = jsonSeed ? 'bootstrap:data-store.json' : 'empty';
   }
 
   // Backfill a real depreciation schedule for any asset that lacks one,

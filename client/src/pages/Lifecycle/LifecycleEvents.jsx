@@ -29,6 +29,7 @@ import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { useAuth } from '../../hooks/useAuth';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { FIELD_SCHEMAS, FIELD_DEFAULTS, reinstatementFieldsFromAsset } from '../../data/lifecycleFormSchemas';
+import { useFormOptions } from '../../hooks/useFormOptions';
 import { EVENT_FORM_COMPONENTS } from './eventForms';
 import {
     parseCsv,
@@ -60,6 +61,7 @@ const MASTER_DATA_SET_CARD = { id: 'master-data-set', label: 'Master Data Set', 
 // ======================================================
 
 export function LifecycleEvents() {
+    useFormOptions();
     const assetClassNames = useAssetClasses();
     const { user, hasEdit } = useAuth();
     const canPost = hasEdit('lifecycle');

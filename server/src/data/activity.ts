@@ -7,20 +7,13 @@ import type { Asset, DepreciationScheduleRow, LifecycleActivity } from '../types
 import { assets, depreciationSchedules } from './assets.js';
 import { ensureSchedules, inServiceDate, round2, toISODate } from '../services/schedule-builder.js';
 import { DEFAULT_BOOK } from './books.js';
+import { classLabel } from '../services/assetClassLabels.js';
 import { scheduleForBook, viewAssetForBook } from '../services/book-view.js';
 
 
 // ======================================================
 // START: Data Functions
 // ======================================================
-
-export const recentActivity: LifecycleActivity[] = [
-  { assetNumber: '845862189', description: 'Network Rack — AWS AFS', event: 'Adjustment', amount: 882.26, date: '2026-04-21', status: 'Posted' },
-  { assetNumber: '846013895', description: 'Data Center HVAC Unit', event: 'Addition', amount: 357772.10, date: '2026-04-06', status: 'Posted' },
-  { assetNumber: '845990931', description: 'Fiber Transceiver Module', event: 'Transfer In', amount: 5710.33, date: '2026-04-04', status: 'Processing' },
-  { assetNumber: '846321878', description: 'Temporary Test Rig', event: 'Retirement', amount: 60566.32, date: '2026-04-21', status: 'Pending' },
-  { assetNumber: '845009019', description: 'Cooling Loop Assembly', event: 'Reclassification', amount: 972.73, date: '2026-04-18', status: 'Posted' }
-];
 
 // Every asset actually stores its IRS Pub. 946 asset-class CODE in
 // `assetClass` (e.g. '00.12', '00.4') — that's what the Add Asset form and
@@ -29,23 +22,7 @@ export const recentActivity: LifecycleActivity[] = [
 // category names ('Network Equipment', 'Buildings', ...) that never once
 // occur in real data, so ~everything fell through to one fallback color and
 // the seeded 0% categories were pure fiction. Short labels for the Table B-1
-// codes that show up in this dataset; anything else just shows its raw code.
-const CLASS_LABELS: Record<string, string> = {
-  '00.11': 'Office Furniture & Equipment',
-  '00.12': 'Information Systems (Computers)',
-  '00.13': 'Data Handling Equipment',
-  '00.21': 'Airplanes & Helicopters',
-  '00.22': 'Automobiles, Taxis',
-  '00.23': 'Buses',
-  '00.241': 'Light General Purpose Trucks',
-  '00.242': 'Heavy General Purpose Trucks',
-  '00.25': 'Railroad Cars & Locomotives',
-  '00.26': 'Tractor Units (Over-the-Road)',
-  '00.27': 'Trailers & Containers',
-  '00.28': 'Vessels, Barges & Tugs',
-  '00.3': 'Land Improvements',
-  '00.4': 'Industrial Steam/Electric Systems'
-};
+// codes come from the asset_class_labels table; anything else just shows its raw code.
 const FALLBACK_COLORS = ['#2563eb', '#0d9488', '#7c3aed', '#d97706', '#94a3b8', '#dc2626', '#059669', '#ca8a04', '#0891b2', '#be185d'];
 
 // ======================================================
@@ -409,7 +386,7 @@ export function computeDashboardSummary(book: string = DEFAULT_BOOK) {
   const assetsByClass = [...classTotals.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([code, nbv], i) => {
-      const label = CLASS_LABELS[code] ?? code;
+      const label = classLabel(code);
       const color = FALLBACK_COLORS[i % FALLBACK_COLORS.length];
       const pct = netBookValue > 0 ? Math.round((nbv / netBookValue) * 100) : 0;
       return { label, pct, color };

@@ -17,80 +17,32 @@
 var RATE_TABLES = (function() {
 
   // ── Table A-1: MACRS 200% DB, Half-Year Convention ─────────
-  var tableA1 = {
-    3: [33.33, 44.45, 14.81, 7.41],
-    5: [20.00, 32.00, 19.20, 11.52, 11.52, 5.76],
-    7: [14.29, 24.49, 17.49, 12.49, 8.93, 8.92, 8.93, 4.46],
-    10: [10.00, 18.00, 14.40, 11.52, 9.22, 7.37, 6.55, 6.55, 6.56, 6.55, 3.28],
-    15: [5.00, 9.50, 8.55, 7.70, 6.93, 6.23, 5.90, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 2.95],
-    20: [3.750, 7.219, 6.677, 6.177, 5.713, 5.285, 4.888, 4.522, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 2.231]
-  };
+  var tableA1 = {}; // loaded from Postgres (see load)
 
   // ── Table A-2: MACRS 200% DB, Mid-Quarter Q1 ───────────────
-  var tableA2_Q1 = {
-    3: [58.33, 27.78, 12.35, 1.54],
-    5: [35.00, 26.00, 15.60, 11.01, 11.01, 1.38],
-    7: [25.00, 21.43, 15.31, 10.93, 8.75, 8.74, 8.75, 1.09],
-    10: [17.50, 16.50, 13.20, 10.56, 8.45, 6.76, 6.55, 6.55, 6.56, 6.55, 0.82],
-    15: [8.75, 9.13, 8.21, 7.39, 6.65, 5.99, 5.90, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 0.74],
-    20: [6.563, 7.000, 6.482, 5.996, 5.546, 5.130, 4.746, 4.459, 4.459, 4.459, 4.459, 4.459, 4.459, 4.459, 4.459, 4.460, 4.459, 4.460, 4.459, 4.460, 0.557]
-  };
+  var tableA2_Q1 = {}; // loaded from Postgres (see load)
 
   // ── Table A-3: MACRS 200% DB, Mid-Quarter Q2 ───────────────
-  var tableA2_Q2 = {
-    3: [41.67, 38.89, 14.14, 5.30],
-    5: [25.00, 30.00, 18.00, 11.37, 11.37, 4.26],
-    7: [17.85, 23.47, 16.76, 11.97, 8.87, 8.87, 8.87, 3.34],
-    10: [12.50, 17.50, 14.00, 11.20, 8.96, 7.17, 6.55, 6.55, 6.56, 6.55, 2.46],
-    15: [6.25, 9.38, 8.44, 7.59, 6.83, 6.15, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 2.21],
-    20: [4.688, 7.148, 6.612, 6.116, 5.658, 5.233, 4.841, 4.478, 4.463, 4.463, 4.463, 4.463, 4.463, 4.462, 4.463, 4.462, 4.463, 4.462, 4.463, 4.462, 1.673]
-  };
+  var tableA2_Q2 = {}; // loaded from Postgres (see load)
 
   // ── Table A-4: MACRS 200% DB, Mid-Quarter Q3 ───────────────
-  var tableA2_Q3 = {
-    3: [25.00, 50.00, 16.67, 8.33],
-    5: [15.00, 34.00, 20.40, 12.24, 11.30, 7.06],
-    7: [10.71, 25.51, 18.22, 13.02, 9.30, 8.85, 8.86, 5.53],
-    10: [7.50, 18.50, 14.80, 11.84, 9.47, 7.58, 6.55, 6.55, 6.56, 6.55, 4.10],
-    15: [3.75, 9.63, 8.66, 7.80, 7.02, 6.31, 5.90, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 3.69],
-    20: [2.813, 7.289, 6.742, 6.237, 5.769, 5.336, 4.936, 4.566, 4.460, 4.460, 4.460, 4.460, 4.461, 4.460, 4.461, 4.460, 4.461, 4.460, 4.461, 4.460, 2.788]
-  };
+  var tableA2_Q3 = {}; // loaded from Postgres (see load)
 
   // ── Table A-5: MACRS 200% DB, Mid-Quarter Q4 ───────────────
-  var tableA2_Q4 = {
-    3: [8.33, 61.11, 20.37, 10.19],
-    5: [5.00, 38.00, 22.80, 13.68, 10.94, 9.58],
-    7: [3.57, 27.55, 19.68, 14.06, 10.04, 8.73, 8.73, 7.64],
-    10: [2.50, 19.50, 15.60, 12.48, 9.98, 7.99, 6.55, 6.55, 6.56, 6.55, 5.74],
-    15: [1.25, 9.88, 8.89, 8.00, 7.20, 6.48, 5.90, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.17],
-    20: [0.938, 7.430, 6.872, 6.357, 5.880, 5.439, 5.031, 4.654, 4.458, 4.458, 4.458, 4.458, 4.458, 4.458, 4.458, 4.458, 4.458, 4.459, 4.458, 4.459, 3.901]
-  };
+  var tableA2_Q4 = {}; // loaded from Postgres (see load)
 
   // ── Table A-14: MACRS 150% DB, Half-Year (State AMT) ───────
-  var table150DB_HY = {
-    3: [25.00, 37.50, 25.00, 12.50],
-    5: [15.00, 25.50, 17.85, 16.66, 16.66, 8.33],
-    7: [10.71, 19.13, 15.03, 12.25, 12.25, 12.25, 12.25, 6.13],
-    10: [7.50, 13.88, 11.79, 10.02, 8.74, 8.74, 8.74, 8.74, 8.74, 8.74, 4.37],
-    15: [5.00, 9.50, 8.55, 7.70, 6.93, 6.23, 5.90, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 5.90, 5.91, 2.95],
-    20: [3.750, 7.219, 6.677, 6.177, 5.713, 5.285, 4.888, 4.522, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 4.462, 4.461, 2.231]
-  };
+  var table150DB_HY = {}; // loaded from Postgres (see load)
 
   // ── Table A-7a: Nonresidential Real 39-Year, Mid-Month ─────
   // Returns percentage for given year and month placed in service (1-12)
   // Year 1 rate depends on month PIS; Years 2-39 = 2.564%; Year 40 = remainder
-  var tableA7a_year1 = {
-    1: 2.461, 2: 2.247, 3: 2.033, 4: 1.819, 5: 1.605, 6: 1.391,
-    7: 1.177, 8: 0.963, 9: 0.749, 10: 0.535, 11: 0.321, 12: 0.107
-  };
-  var tableA7a_annual = 2.564; // Years 2 through 39
+  var tableA7a_year1 = {}; // loaded from Postgres (see load)
+  var tableA7a_annual = 0; // loaded from Postgres (see load)
 
   // ── Table A-6: Residential Rental 27.5-Year, Mid-Month ─────
-  var tableA6_year1 = {
-    1: 3.485, 2: 3.182, 3: 2.879, 4: 2.576, 5: 2.273, 6: 1.970,
-    7: 1.667, 8: 1.364, 9: 1.061, 10: 0.758, 11: 0.455, 12: 0.152
-  };
-  var tableA6_annual = 3.636; // Years 2 through 27; Year 28 varies
+  var tableA6_year1 = {}; // loaded from Postgres (see load)
+  var tableA6_annual = 0; // loaded from Postgres (see load)
 
   // ── ADS Straight-Line, Half-Year Convention ────────────────
   // ADS uses straight-line over ADS recovery period with HY convention
@@ -130,29 +82,20 @@ var RATE_TABLES = (function() {
   // ======================================================
 
   // ── Nonresidential Real Property 40-Year Mid-Month (ADS) ───
-  var tableA13a_year1 = {
-    1: 2.396, 2: 2.188, 3: 1.979, 4: 1.771, 5: 1.563, 6: 1.354,
-    7: 1.146, 8: 0.938, 9: 0.729, 10: 0.521, 11: 0.313, 12: 0.104
-  };
-  var tableA13a_annual = 2.500; // Years 2 through 40
+  var tableA13a_year1 = {}; // loaded from Postgres (see load)
+  var tableA13a_annual = 0; // loaded from Postgres (see load)
 
   // ── ADS Specific Recovery Period Tables (SL, Half-Year) ────
   // These are formula-based: Year 1 = (1/life)/2, Years 2-N = 1/life, Year N+1 = (1/life)/2
-  var adsLives = [3, 5, 9, 10, 12, 20, 25]; // supported ADS HY lives
+  var adsLives = []; // loaded from Postgres (see load)
 
   // ── ADS 30-Year Residential SL Mid-Month ───────────────────
-  var adsResidential30_year1 = {
-    1: 1.597, 2: 1.458, 3: 1.319, 4: 1.181, 5: 1.042, 6: 0.903,
-    7: 0.764, 8: 0.625, 9: 0.486, 10: 0.347, 11: 0.208, 12: 0.069
-  };
-  var adsResidential30_annual = 3.333; // Years 2 through 30
+  var adsResidential30_year1 = {}; // loaded from Postgres (see load)
+  var adsResidential30_annual = 0; // loaded from Postgres (see load)
 
   // ── ADS 40-Year Nonresidential SL Mid-Month ────────────────
-  var adsNonresidential40_year1 = {
-    1: 1.198, 2: 1.094, 3: 0.990, 4: 0.885, 5: 0.781, 6: 0.677,
-    7: 0.573, 8: 0.469, 9: 0.365, 10: 0.260, 11: 0.156, 12: 0.052
-  };
-  var adsNonresidential40_annual = 2.500; // Years 2 through 40
+  var adsNonresidential40_year1 = {}; // loaded from Postgres (see load)
+  var adsNonresidential40_annual = 0; // loaded from Postgres (see load)
 
   // ── Straight-Line, Full-Month Convention ───────────────────
   // Full month of depreciation in the month placed in service
@@ -190,6 +133,50 @@ var RATE_TABLES = (function() {
   // Year 1 = (1/life) × 50%, Years 2-N = 1/life, Year N+1 = remainder
   // Already handled by slHalfYearRate function
 
+  // ── Database loader ────────────────────────────────────────
+  // The percentage tables are NOT stored in this file any more. The server reads them from
+  // Postgres (macrs_rate_by_year, macrs_mm_rate, macrs_ads_lives) at boot and hands them in here.
+  // data = { byYear: { '<tableKey>': { '<life>': [pct, pct, ...] } },
+  //          mm:     { '<tableKey>': { year1: { '1': pct, ... '12': pct }, annual: pct } },
+  //          adsLives: [3, 5, ...] }
+  var loaded = false;
+
+  // ======================================================
+  // Function : load
+  // Purpose  : Fills every rate table from the data read out of the database.
+  // ======================================================
+
+  function load(data) {
+    var by = (data && data.byYear) || {};
+    var mm = (data && data.mm) || {};
+    function need(tbl, key) {
+      if (!tbl[key]) throw new Error('RATE_TABLES: table "' + key + '" is missing in the database - run db/rate-tables.sql');
+      return tbl[key];
+    }
+    tableA1 = need(by, 'A1_HY_200DB');
+    tableA2_Q1 = need(by, 'A2_MQ_Q1_200DB');
+    tableA2_Q2 = need(by, 'A3_MQ_Q2_200DB');
+    tableA2_Q3 = need(by, 'A4_MQ_Q3_200DB');
+    tableA2_Q4 = need(by, 'A5_MQ_Q4_200DB');
+    table150DB_HY = need(by, 'A14_150DB_HY');
+    var a7a = need(mm, 'A7a_39yr_MM');             tableA7a_year1 = a7a.year1;             tableA7a_annual = a7a.annual;
+    var a6 = need(mm, 'A6_27yr_MM');               tableA6_year1 = a6.year1;               tableA6_annual = a6.annual;
+    var a13a = need(mm, 'A13a_40yr_MM');           tableA13a_year1 = a13a.year1;           tableA13a_annual = a13a.annual;
+    var r30 = need(mm, 'ADS_30yr_Residential_MM'); adsResidential30_year1 = r30.year1;     adsResidential30_annual = r30.annual;
+    var n40 = need(mm, 'ADS_40yr_Nonresidential_MM'); adsNonresidential40_year1 = n40.year1; adsNonresidential40_annual = n40.annual;
+    adsLives = (data && data.adsLives) || [];
+    loaded = true;
+  }
+
+  // ======================================================
+  // END: load
+  // ======================================================
+
+  // Fail loudly instead of silently falling back to straight-line when the tables were never loaded.
+  function assertLoaded() {
+    if (!loaded) throw new Error('RATE_TABLES not loaded from the database - call initRateTables() at server boot (run db/rate-tables.sql first)');
+  }
+
   // ── Lookup Function ────────────────────────────────────────
   // Returns the annual depreciation percentage for a given year
   // based on method, life, convention, and placement details.
@@ -199,6 +186,7 @@ var RATE_TABLES = (function() {
   // ======================================================
 
   function lookupRate(params) {
+    assertLoaded();
     var method = params.method;         // 'MACRS', 'MACRS ADS', 'SL', 'MACRS 150DB'
     var lifeYears = params.lifeYears;   // e.g., 5, 7, 39
     var convention = params.convention; // 'HY', 'MQ', 'Mid-Month', 'Full-Month'
@@ -365,6 +353,7 @@ var RATE_TABLES = (function() {
   // ======================================================
 
   function getCumulativeDepr(params) {
+    assertLoaded();
     var cost = params.cost;
     var bonusPercent = params.bonusPercent || 0;
     var basis = cost * (1 - bonusPercent / 100);
@@ -438,11 +427,13 @@ var RATE_TABLES = (function() {
 
   // ── Public API ─────────────────────────────────────────────
   return {
+    load: load,
+    isLoaded: function() { return loaded; },
     lookupRate: lookupRate,
     getMonthlyDepr: getMonthlyDepr,
     getCumulativeDepr: getCumulativeDepr,
     // Expose raw tables for display/debugging
-    tables: {
+    get tables() { return {
       'A1_HY_200DB': tableA1,
       'A2_MQ_Q1_200DB': tableA2_Q1,
       'A3_MQ_Q2_200DB': tableA2_Q2,
@@ -455,7 +446,7 @@ var RATE_TABLES = (function() {
       'ADS_30yr_Residential_MM': { year1: adsResidential30_year1, annual: adsResidential30_annual },
       'ADS_40yr_Nonresidential_MM': { year1: adsNonresidential40_year1, annual: adsNonresidential40_annual },
       'ADS_HY_lives': adsLives
-    }
+    }; }
   };
 })();
 

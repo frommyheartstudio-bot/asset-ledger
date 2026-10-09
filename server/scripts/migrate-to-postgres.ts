@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { pool, pingPostgres } from '../src/db/postgres.js';
 import { flush } from '../src/db/repo.js';
 import { ensureSchedules } from '../src/services/schedule-builder.js';
+import { initRateTables } from '../src/services/rateTables.js';
+import { initRecoveryDefaults } from '../src/services/recoveryDefaults.js';
 import type { Asset, DepreciationScheduleRow, TimelineEntry } from '../src/types.js';
 
 // ======================================================
@@ -28,7 +30,8 @@ import type { Asset, DepreciationScheduleRow, TimelineEntry } from '../src/types
 // ======================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = path.join(__dirname, '..', 'data-store.json');
+// Optional arg: JSON file to load (default data-store.json). Sample data: db/seed-assets.json (npm run db:seed:assets).
+const STORE_PATH = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'data-store.json');
 
 type StoreShape = {
   assets: Asset[];
@@ -47,6 +50,8 @@ async function main(): Promise<void> {
     console.error('Apply the schema first: npm run db:schema:apply');
     process.exit(1);
   }
+  await initRateTables();
+  await initRecoveryDefaults();
 
   if (!fs.existsSync(STORE_PATH)) {
     console.error(`No data-store.json at ${STORE_PATH} — nothing to migrate.`);
@@ -78,11 +83,13 @@ async function main(): Promise<void> {
   `);
   console.table(result.rows);
 
-  // Move the JSON out of the way so nothing can accidentally read it
-  // back as a source of truth.
-  const archived = `${STORE_PATH}.migrated-${new Date().toISOString().slice(0, 10)}`;
-  fs.renameSync(STORE_PATH, archived);
-  console.log(`\nArchived ${path.basename(STORE_PATH)} -> ${path.basename(archived)}`);
+  // Only the default data-store.json is archived; an explicit file arg (e.g. db/seed-assets.json) is left in place.
+  if (!process.argv[2]) {
+    // Move the JSON out of the way so nothing can accidentally read it back as a source of truth.
+    const archived = `${STORE_PATH}.migrated-${new Date().toISOString().slice(0, 10)}`;
+    fs.renameSync(STORE_PATH, archived);
+    console.log(`\nArchived ${path.basename(STORE_PATH)} -> ${path.basename(archived)}`);
+  }
   console.log('Postgres is now the source of truth.');
 
   await pool.end();

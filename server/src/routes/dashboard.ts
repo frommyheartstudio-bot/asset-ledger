@@ -4,7 +4,8 @@
 // ======================================================
 
 import { Router } from 'express';
-import { computeDashboardSummary, computeMonthlyDepreciationForYear, recentActivity } from '../data/activity.js';
+import { computeDashboardSummary, computeMonthlyDepreciationForYear } from '../data/activity.js';
+import { loadRecentActivity } from '../db/repo.js';
 import { resolveBook } from '../data/books.js';
 import { primeBookRules } from '../services/book-view.js';
 
@@ -33,8 +34,13 @@ dashboardRouter.get('/summary', async (req, res) => {
   }
 });
 
-dashboardRouter.get('/activity', (_req, res) => {
-  res.json(recentActivity);
+dashboardRouter.get('/activity', async (_req, res) => {
+  try {
+    res.json(await loadRecentActivity());
+  } catch (err) {
+    console.error('[dashboard] activity failed:', err);
+    res.status(500).json({ error: 'Failed to load recent activity' });
+  }
 });
 
 // ======================================================

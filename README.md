@@ -193,6 +193,82 @@ and `asset_depreciation_schedule` (rewritten to reflect the new state).
 Everything else on the site is either a read-only page load or a
 client-side/preview-only calculation that saves nothing.
 
+## 💹 Bonus Depreciation — Customize Table
+
+Configuration → Bonus Depreciation → **Table: Customize Table**. It has exactly the
+**Default Table's columns** — Year Placed in Service, Bonus %, Longer Production
+Period / Aircraft, Legislative Authority, Notes — plus three extra columns at the
+front: **Book, Company, Asset Type** (`-` / blank = all). Rows are editable
+(`+ Add Rule`, Edit, Delete) and live in `bonus_depreciation_custom_table`.
+
+**Starts as a copy of the Default Table.** The first time the server loads the
+Customize Table it copies every active row of `bonus_depreciation_rates` (same
+Year label, %, LPP %, authority, notes, highlight, order) with Book / Company /
+Asset Type = all. This happens once (flag table `bonus_custom_seed_v2`); deleting
+rows later does not re-copy. If the Default Table is empty at that moment
+(config-tables.sql not run yet) nothing is copied and it is retried next start.
+The earlier build's copy of the date rules is removed automatically (only rows
+still identical to a default rule).
+
+**Copied rows are marked "Default" and do not change any calculation until you
+edit them.** Editing a row (or adding one) makes it active.
+
+**Year Placed in Service decides the period.** Type it the way the Default Table
+does: `2026`, `2027+`, `2026–2027`, `Jan 2026`, `Jan 2026 – Jun 2026`,
+`2026-01 to 2026-06`, `Jan 2026+`, `2025 (acquired after 1/19/2025)`,
+`Before 9/11/2001`. The server reads it (`parsePeriodLabel` in `bonusPeriod.ts`)
+into exact From / To dates used for the calculation; an unrecognised text is
+rejected with a hint. There are no separate date pickers.
+
+**How an asset's Bonus % is chosen** (first hit wins):
+
+1. An *active* Customize Table row whose period contains the asset's
+   placed-in-service date and whose non-blank Book / Company / Asset Type all
+   equal the asset's. Rows can be any combo (only Book, only Company, only
+   Asset Type, or a mix). Most specific row (most non-blank fields) wins; on a
+   tie Book beats Company beats Asset Type; then the newest row.
+2. The Asset Class row's own Bonus %.
+3. **Default Table** — the date-based IRS rules (`bonus_depreciation_rules`).
+
+**Paste from Excel** (button above the table) adds many rows at once from cells
+copied as `Book | Company | Asset Type | year | bonus %` (`-` = all; year like
+`2026`, `2027+`, `Jan 2026 – Jun 2026` ...). 
+A row with Book, Company **and** Asset Type set (e.g. Federal · 2D · 00.13) applies
+only to assets that match all three and whose placed-in-service date falls in its
+Year. In the Addition form, the Bonus % box then says where the value came from
+("From Customize Table (Federal · 2D · 00.13; 2026)"); `/config/bonus-rates/resolve`
+re-reads the saved rows on every call so edits apply immediately.
+
+Year text also accepts the exact forms the table shows for old rows
+(`2025-01-20 – Open`, `20 Jan 2025 – 31 Mar 2025`). On start the server re-reads
+the dates of any row whose label is in that form, repairing rows an earlier build
+had saved as a whole calendar year.
+
+If no Customize Table row matches, the note under Bonus % lists exactly what was
+compared (Book, Company, Asset Class, date, how many active rows were checked, and
+any server error reading the table) — handy for finding a mismatch.
+
+In the Addition form Bonus % is always filled by year: from the Placed-In-Service
+Date, or (until that is entered) the Accounting Period Date, or today's year — and
+it re-fills the moment the real date, Book, Company or Asset Class changes.
+
+The Addition form (Lifecycle Events) has **Book** and **Company** fields and fills
+Bonus % from this lookup; the value stays editable. If Bonus % is blank on the
+server (e.g. bulk import) the same lookup runs. Active rows with the same Book /
+Company / Asset Type cannot have overlapping periods (the API returns 409).
+
+Code: `server/src/services/bonusRates.ts` (`customBonusPct`),
+`server/src/services/bonusPeriod.ts`, `server/src/routes/misc.ts`
+(`/config/bonus-rates/custom`, `/config/bonus-rates/resolve`),
+`client/src/pages/Configuration/BonusDepreciation.jsx` (`CustomBonusTable`).
+
+## ➕ Add Asset
+
+**+ Add Asset** on the Asset Register opens the **Addition** form in Lifecycle Events
+(`/lifecycle?type=addition`), the same form used for posting an Addition. The old
+`/assets/new` address redirects there. The button shows for users with Lifecycle
+edit access.
+
 ## API surface
 
 | Method | Path | Notes |
@@ -244,3 +320,25 @@ client-side/preview-only calculation that saves nothing.
 - `server/CREATE`, `server/tsx`, and `server/asset-ledger-server@0.1.0`
   are stray **0-byte junk files** (likely from a mistyped terminal
   command) — they are not used by the app and are safe to delete.
+
+## 🗄️ Values live in the DB, code holds only keys
+
+No reference data is hard-coded any more (books + default book, bonus depreciation, form dropdowns,
+asset types, asset classes, companies, Pub 946 tables, roles/users/report catalog). The server does
+NOT seed anything at boot; it refuses to start (and names the SQL file) if a table is empty.
+
+Fill the DB once (all files are safe to re-run):
+
+```bash
+cd server
+npm run db:schema:apply   # tables (or: npm run db:schema)
+npm run db:seed:assets    # optional: load the 9 sample assets (db/seed-assets.json)
+npm run db:seed           # config-tables.sql, asset-type-config.sql, rate-tables.sql, seed-asset-classes.sql, seed-admin.sql, seed-activity.sql
+```
+
+Also moved to DB: IRS Table B-1 lookup rows (`irs_class_lookup`), default recovery years (`class_default_life`),
+Modeling default scenarios (`modeling_scenarios`), asset-form method dropdown (`form_option_lists`, list `assetMethod`).
+Optional one-time cleanup of old starter rows: `db/cleanup-legacy-custom-rows.sql`.
+
+To change a value later, edit the row in Postgres (e.g. `UPDATE app_settings SET value='GAAP' WHERE key='defaultBook'`)
+and restart the server. Code only knows the keys (`defaultBook`, list names such as `rateTable`, ...).

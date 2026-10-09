@@ -12,9 +12,9 @@
 // ======================================================
 
 import { Router } from 'express';
-import { computeForecast, recentActivity } from '../data/activity.js';
+import { computeForecast } from '../data/activity.js';
 import { BOOKS, resolveBook } from '../data/books.js';
-import { loadAssetClasses } from '../db/repo.js';
+import { loadAssetClasses, loadRecentActivity } from '../db/repo.js';
 import { primeBookRules } from '../services/book-view.js';
 import type { ActionCard } from '../services/agent-actions.js';
 import { MODEL, PROPOSE_TOOL, TOOLS, runTool, type AgentCtx } from './chat.js';
@@ -59,7 +59,7 @@ const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_u
 
 async function runSiteTool(name: string, input: any, ctx: AgentCtx): Promise<unknown> {
   await primeBookRules();
-  if (name === 'get_recent_activity') return recentActivity;
+  if (name === 'get_recent_activity') return loadRecentActivity();
   if (name === 'list_books') return BOOKS.map((b) => ({ name: b.name, description: b.description, bookOfRecord: b.bookOfRecord }));
   if (name === 'list_asset_classes') {
     const rows = await loadAssetClasses();

@@ -17,7 +17,8 @@ import { useAssets } from '../../hooks/useAssets';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { useAuth } from '../../context/AuthContext';
 import { BookSelect } from '../../components/ui/BookSelect';
-import { DEFAULT_BOOK } from '../../data/books';
+import { getDefaultBook } from '../../hooks/useBooks';
+import { useFormOptions } from '../../hooks/useFormOptions';
 
 // ======================================================
 // START: Page Component
@@ -25,7 +26,6 @@ import { DEFAULT_BOOK } from '../../data/books';
 
 const COMPANY_OPTIONS = ['5B', 'R9', '2D', 'GD'];
 const STATUS_OPTIONS = ['Active', 'Retired', 'Transferred', 'Fully Depreciated'];
-const METHOD_OPTIONS = ['MACRS', 'MACRS ADS', 'Straight-Line'];
 
 // ======================================================
 // Function : exportAssetsCsv
@@ -54,6 +54,7 @@ function exportAssetsCsv(assets, book) {
 // ======================================================
 
 export function AssetRegister() {
+    const METHOD_OPTIONS = useFormOptions().lists.registerMethodFilter ?? [];
     const assetClassNames = useAssetClasses();
     const [searchParams, setSearchParams] = useSearchParams();
     // Empty array == "All" for each filter — MultiSelect lets the person
@@ -65,10 +66,11 @@ export function AssetRegister() {
     const [selectedKeys, setSelectedKeys] = useState(() => new Set());
     // Which book's numbers (accum. depreciation, NBV, method) the table shows.
     // Federal Tax is what the register always showed.
-    const [book, setBook] = useState(DEFAULT_BOOK);
+    const [book, setBook] = useState(getDefaultBook());
     const navigate = useNavigate();
     const { hasEdit } = useAuth();
-    const canAdd = hasEdit('assets');
+    // "+ Add Asset" opens the Addition form in Lifecycle Events, so it needs Lifecycle edit access.
+    const canAdd = hasEdit('lifecycle');
 
     // The URL is the source of truth for the *applied* search text (so the
     // header search box, which navigates to /assets?q=..., keeps working).
@@ -76,6 +78,9 @@ export function AssetRegister() {
     // search text, not the four dropdown filters — until the Search button
     // is clicked (or Enter is pressed in the search box).
     const query = searchParams.get('q') ?? '';
+    // ?exclude=Retired (from the chat's "Active assets: N" link) hides that status,
+    // so the table shows exactly the assets the dashboard counted.
+    const excludeStatus = searchParams.get('exclude') ?? '';
     const [draftQuery, setDraftQuery] = useState(query);
     useEffect(() => { setDraftQuery(query); }, [query]);
 
@@ -83,7 +88,10 @@ export function AssetRegister() {
     const [applied, setApplied] = useState({ assetClass: [], company: [], status: [], method: [] });
     const handleSearch = () => {
         const q = draftQuery.trim();
-        setSearchParams(q ? { q } : {}, { replace: true });
+        const next = {};
+        if (q) next.q = q;
+        if (excludeStatus) next.exclude = excludeStatus;
+        setSearchParams(next, { replace: true });
         setApplied({ assetClass: [...assetClass], company: [...company], status: [...status], method: [...method] });
     };
 
@@ -93,11 +101,12 @@ export function AssetRegister() {
     const { items, total, loading, error, reload } = useAssets({ q: query || undefined, book });
 
     const filteredItems = useMemo(() => {
-        return items.filter((a) => (applied.assetClass.length === 0 || applied.assetClass.includes(a.assetClass))
+        return items.filter((a) => (!excludeStatus || a.status !== excludeStatus)
+            && (applied.assetClass.length === 0 || applied.assetClass.includes(a.assetClass))
             && (applied.company.length === 0 || applied.company.includes(a.company))
             && (applied.status.length === 0 || applied.status.includes(a.status))
             && (applied.method.length === 0 || applied.method.includes(a.method)));
-    }, [items, applied]);
+    }, [items, applied, excludeStatus]);
 
     // Rows the chosen book has no rule for (they mirror Federal Tax) — drives the note above the table.
     const mirroredCount = useMemo(() => items.filter((a) => a.ruleSource === 'federal-mirror').length, [items]);
@@ -106,13 +115,13 @@ export function AssetRegister() {
     // filters change and it's no longer even on screen.
     useEffect(() => {
         setSelectedKeys(new Set());
-    }, [query, applied, book]);
+    }, [query, applied, book, excludeStatus]);
 
     // Client-side pagination over the filtered list. Page resets to 1
     // whenever the applied filters/search or the page size change.
     const [pageSize, setPageSize] = useState(10);
     const [page, setPage] = useState(1);
-    useEffect(() => { setPage(1); }, [query, applied, pageSize]);
+    useEffect(() => { setPage(1); }, [query, applied, pageSize, excludeStatus]);
     const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
     const currentPage = Math.min(page, totalPages);
     const pageStart = (currentPage - 1) * pageSize;
@@ -153,7 +162,7 @@ export function AssetRegister() {
           <Button variant="ghost" onClick={handleExport}>
             Export CSV{selectedKeys.size > 0 ? ` (${selectedKeys.size})` : ''}
           </Button>
-          {canAdd && (<Button variant="primary" to="/assets/new">
+          {canAdd && (<Button variant="primary" to="/lifecycle?type=addition">
             + Add Asset
           </Button>)}
         </div>
@@ -172,6 +181,11 @@ export function AssetRegister() {
         </div>
       </div>
 
+      {excludeStatus && (<p className="book-note">
+          Showing all assets except {excludeStatus.toLowerCase()} ones ({filteredItems.length} of {items.length}).{' '}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSearchParams(query ? { q: query } : {}, { replace: true })}>Show all</button>
+        </p>)}
+
       {error && <ErrorMessage message={error} onRetry={reload}/>}
 
       {!error && (<div className="card">
@@ -189,7 +203,7 @@ export function AssetRegister() {
             </div>
           </div>
 
-          {!loading && book !== DEFAULT_BOOK && mirroredCount > 0 && (<p className="book-note">
+          {!loading && book !== getDefaultBook() && mirroredCount > 0 && (<p className="book-note">
               {mirroredCount === items.length ? 'No' : `${mirroredCount} of ${items.length} assets have no`} {book}-specific depreciation rule for their asset class, so {mirroredCount === items.length ? 'every row' : 'those rows'} show Federal Tax figures. Add rules in Configuration → Asset Classes → Customize Table.
             </p>)}
 
@@ -197,7 +211,7 @@ export function AssetRegister() {
 
           {!loading && filteredItems.length === 0 && (<EmptyState title="No assets match these filters" description="Try widening the Asset Class or Company filter."/>)}
 
-          {!loading && filteredItems.length > 0 && (<div className="table-paged"><AssetTable assets={pageItems} onSelect={(a) => navigate(`/assets/${a.assetNumber}${book !== DEFAULT_BOOK ? `?book=${encodeURIComponent(book)}` : ''}`)} selection={selection}/></div>)}
+          {!loading && filteredItems.length > 0 && (<div className="table-paged"><AssetTable assets={pageItems} onSelect={(a) => navigate(`/assets/${a.assetNumber}${book !== getDefaultBook() ? `?book=${encodeURIComponent(book)}` : ''}`)} selection={selection}/></div>)}
 
           <div className="card-pad flex items-center justify-between">
             <div className="flex items-center gap-2">

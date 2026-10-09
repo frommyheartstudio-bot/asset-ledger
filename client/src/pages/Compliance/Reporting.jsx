@@ -17,9 +17,9 @@ import { MultiSelect } from '../../components/ui/MultiSelect';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { formatDate } from '../../utils/formatDate';
-import { companyName } from '../../data/companies';
+import { companyName } from '../../utils/companies';
 import { downloadCsv } from '../../utils/csv';
-import { DEFAULT_BOOK, FALLBACK_BOOK_NAMES } from '../../data/books';
+import { getDefaultBook, getBookNames } from '../../hooks/useBooks';
 import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 
 // ======================================================
@@ -41,7 +41,6 @@ const STATUS_TONE = { Ready: 'green', Draft: 'amber', Processing: 'blue' };
 // Every maintained book (same list every Book dropdown in the app uses).
 // A generated report contains the rows of EACH book ticked here, each
 // row tagged with its Book — figures come from that book's own rules.
-const BOOK_OPTIONS = FALLBACK_BOOK_NAMES;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FREQUENCY_OPTIONS = ['Daily', 'Monthly', 'Quarterly', 'Half-Yearly'];
 // Focus Period's Year select. The past end is a fixed anchor year (30
@@ -55,7 +54,7 @@ const MIN_YEAR = 1996; // = 2026 - 30, fixed at build time
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 30 - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i);
 
 const CSV_COLUMNS = [
-    { header: 'Book', get: (a) => a.book ?? DEFAULT_BOOK },
+    { header: 'Book', get: (a) => a.book ?? getDefaultBook() },
     { header: 'Asset Number', get: (a) => a.assetNumber },
     { header: 'Description', get: (a) => a.description },
     { header: 'Asset Class', get: (a) => a.assetClass },
@@ -176,7 +175,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
     const [periodStart, setPeriodStart] = useState('Jan');
     const [periodEnd, setPeriodEnd] = useState('Dec');
     const [periodYear, setPeriodYear] = useState(CURRENT_YEAR);
-    const [books, setBooks] = useState([DEFAULT_BOOK]);
+    const [books, setBooks] = useState([getDefaultBook()]);
     const [companies, setCompanies] = useState([]);
     const [assetTypes, setAssetTypes] = useState([]);
     const [error, setError] = useState(null);
@@ -208,7 +207,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
         setPeriodStart('Jan');
         setPeriodEnd('Dec');
         setPeriodYear(CURRENT_YEAR);
-        setBooks([DEFAULT_BOOK]);
+        setBooks([getDefaultBook()]);
         setCompanies(companyOptions.map((o) => o.value));
         setAssetTypes(assetTypeOptions.map((o) => o.value));
         setError(null);
@@ -239,7 +238,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
         }
 
         const period = periodStart === periodEnd ? `${periodStart} ${periodYear}` : `${periodStart}–${periodEnd} ${periodYear}`;
-        const bookLabel = books.length === BOOK_OPTIONS.length ? 'All Books' : books.join(', ');
+        const bookLabel = books.length === getBookNames().length ? 'All Books' : books.join(', ');
 
         setGenerating(true);
         try {
@@ -285,7 +284,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
         <div className="hint">Start defaults to Jan, end defaults to Dec — covers the full year unless narrowed.</div>
       </div>
 
-      <MultiSelect label="Book" options={BOOK_OPTIONS.map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks}/>
+      <MultiSelect label="Book" options={getBookNames().map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks}/>
       <MultiSelect label="Company" options={companyOptions} selected={companies} onChange={setCompanies}/>
       <MultiSelect label="Asset Type" options={assetTypeOptions} selected={assetTypes} onChange={setAssetTypes}/>
 
@@ -311,7 +310,7 @@ function NewReportCard({ open, onClose, allAssets, onGenerated, initialName }) {
 function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
     const { user } = useAuth();
     const [frequency, setFrequency] = useState('Monthly');
-    const [books, setBooks] = useState([DEFAULT_BOOK]);
+    const [books, setBooks] = useState([getDefaultBook()]);
     const [companies, setCompanies] = useState([]);
     const [assetTypes, setAssetTypes] = useState([]);
     const [error, setError] = useState(null);
@@ -342,7 +341,7 @@ function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
 
     function reset() {
         setFrequency('Monthly');
-        setBooks([DEFAULT_BOOK]);
+        setBooks([getDefaultBook()]);
         setCompanies(companyOptions.map((o) => o.value));
         setAssetTypes(assetTypeOptions.map((o) => o.value));
         setError(null);
@@ -372,7 +371,7 @@ function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
             return;
         }
 
-        const bookLabel = books.length === BOOK_OPTIONS.length ? 'All Books' : books.join(', ');
+        const bookLabel = books.length === getBookNames().length ? 'All Books' : books.join(', ');
         const period = `${formatDate(startIso)} – ${formatDate(endIso)}`;
         const name = `Scheduled — ${frequency}`;
 
@@ -410,7 +409,7 @@ function ScheduledReportCard({ open, onClose, allAssets, onGenerated }) {
         <div className="hint">Always the start of this year through the end of last month — updates automatically as months close.</div>
       </div>
 
-      <MultiSelect label="Book" options={BOOK_OPTIONS.map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks}/>
+      <MultiSelect label="Book" options={getBookNames().map((b) => ({ value: b, label: b }))} selected={books} onChange={setBooks}/>
       <MultiSelect label="Company" options={companyOptions} selected={companies} onChange={setCompanies}/>
       <MultiSelect label="Asset Type" options={assetTypeOptions} selected={assetTypes} onChange={setAssetTypes}/>
 
@@ -520,7 +519,7 @@ export function Reporting() {
           <h3>Recently Generated Reports</h3>
           <select className="btn btn-ghost btn-sm" value={bookFilter} onChange={(e) => setBookFilter(e.target.value)}>
             <option>All Books</option>
-            {BOOK_OPTIONS.map((b) => (<option key={b}>{b}</option>))}
+            {getBookNames().map((b) => (<option key={b}>{b}</option>))}
           </select>
         </div>
         {visibleRecent.length === 0 ? (<EmptyState title="No reports generated yet" description="Reports you generate will show up here."/>) : (<Table columns={columns} rows={visibleRecent} rowKey={(r) => `${r.name}-${r.date}`}/>)}

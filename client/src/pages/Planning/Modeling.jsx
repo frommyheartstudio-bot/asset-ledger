@@ -13,11 +13,11 @@ import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { Select } from '../../components/ui/Input';
 import { MultiSelect } from '../../components/ui/MultiSelect';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
-import { companyName } from '../../data/companies';
+import { companyName } from '../../utils/companies';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 import { BookSelect } from '../../components/ui/BookSelect';
-import { DEFAULT_BOOK } from '../../data/books';
+import { getDefaultBook } from '../../hooks/useBooks';
 
 // ======================================================
 // START: Page Component
@@ -32,7 +32,7 @@ const TONE_PILL = { 0: 'blue', 1: 'purple', 2: 'amber' };
 const PROJECTION_YEARS = 4;
 
 export function Modeling() {
-    const [basis, setBasis] = useState(1_000_000);
+    const [basis, setBasis] = useState(0); // real value comes from the DB via /modeling/scenarios
     const [scenarios, setScenarios] = useState([]);
     const [results, setResults] = useState([]);
 
@@ -49,7 +49,7 @@ export function Modeling() {
     // One book at a time — the assets (their method / recovery / schedules) and
     // both result tables below are computed from that book. Picking another
     // book reloads the assets and re-runs the comparison straight away.
-    const [book, setBook] = useState(DEFAULT_BOOK);
+    const [book, setBook] = useState(getDefaultBook());
     const [companies, setCompanies] = useState([]);
     const assetClassNames = useAssetClasses();
     const ASSET_TYPE_OPTIONS = useMemo(() => assetClassNames.map((c) => ({ value: c, label: c })), [assetClassNames]);

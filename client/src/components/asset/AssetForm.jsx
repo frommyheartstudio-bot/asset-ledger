@@ -7,12 +7,12 @@ import { useEffect, useState } from 'react';
 import { Input, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
+import { useFormOptions } from '../../hooks/useFormOptions';
 
 // ======================================================
 // START: Component Functions
 // ======================================================
 
-const METHODS = ['MACRS ADS', 'MACRS 200% DB', 'Straight-Line'];
 /** Add/edit form for a single asset. Used by the Assets/AssetForm page. */
 // ======================================================
 // Function : AssetForm
@@ -28,7 +28,13 @@ export function AssetForm({ initial, onSubmit, submitLabel = 'Save Asset' }) {
     }, [assetClassNames, assetClass]);
     const [company, setCompany] = useState(initial?.company ?? '');
     const [cost, setCost] = useState(String(initial?.cost ?? ''));
-    const [method, setMethod] = useState(initial?.method ?? METHODS[0]);
+    // Method choices come from the database (form_option_lists, list 'assetMethod').
+    const { lists } = useFormOptions();
+    const methods = lists.assetMethod ?? [];
+    const [method, setMethod] = useState(initial?.method ?? '');
+    useEffect(() => {
+        if (!method && methods.length) setMethod(methods[0]);
+    }, [methods, method]);
     function handleSubmit() {
         onSubmit({
             ...initial,
@@ -45,7 +51,7 @@ export function AssetForm({ initial, onSubmit, submitLabel = 'Save Asset' }) {
         <Select label="Asset Class" value={assetClass} onChange={setAssetClass} options={assetClassNames} hint="Pick from Configuration → Asset Classes."/>
         <Input label="Company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. 5B"/>
         <Input label="Cost" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0"/>
-        <Select label="Depreciation Method" value={method} onChange={setMethod} options={METHODS}/>
+        <Select label="Depreciation Method" value={method} onChange={setMethod} options={methods}/>
       </div>
       <div className="flex gap-2 mt-2">
         <Button variant="primary" onClick={handleSubmit}>

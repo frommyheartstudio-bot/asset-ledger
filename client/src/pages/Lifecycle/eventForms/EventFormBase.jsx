@@ -15,14 +15,17 @@
 //             active — this component only receives it as props.
 // ======================================================
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pill } from '../../../components/ui/ui';
 import { Button } from '../../../components/ui/Button';
 import { Input, Select } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { AssetClassFinder } from '../../../components/asset/AssetClassFinder';
 import { EmptyState } from '../../../components/common/EmptyState';
-import { bonusPctForDate } from '../../../data/bonusDepreciation';
+import { useBonusRates } from '../../../hooks/useBonusRates';
+import { useBooks } from '../../../hooks/useBooks';
+import { configApi } from '../../../api/config.api';
+import { useFormOptions } from '../../../hooks/useFormOptions';
 import { QUARTER_OPTIONS } from '../../../data/lifecycleFormSchemas';
 import { useAssetClassRows, useAssetClasses, useAssetClassHistory, resolveClassVersion, lifeToMonths, conventionToOption } from '../../../hooks/useAssetClasses';
 
@@ -56,7 +59,11 @@ export function EventFormBase({
     blockMessage,
     canPost
 }) {
+    useFormOptions();
+    const { rules: bonusRules, pctForDate } = useBonusRates();
     const assetClassNames = useAssetClasses();
+    const { names: bookNames } = useBooks();
+    const [bonusNote, setBonusNote] = useState('');
     const assetClassRows = useAssetClassRows();
     const classHistory = useAssetClassHistory();
     // Picking an Asset Class fills Property Type / Method / Rate % /
@@ -83,6 +90,11 @@ export function EventFormBase({
     // PIS date. Everything stays editable; it re-fills when class or date changes.
     const hasClassField = schema.some((fld) => fld.optionsSource === 'assetClasses');
     const pis = formData.placedInService;
+    // Bonus % is always filled by year: the Placed-In-Service Date, else the Accounting Period Date,
+    // else today's date (until the real PIS date is entered; it re-fills the moment it is).
+    const isoOk = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+    const bonusDate = isoOk(pis) ? pis : isoOk(formData.accountingPeriodDate) ? formData.accountingPeriodDate : new Date().toISOString().slice(0, 10);
+    const bonusDateIsFallback = !isoOk(pis);
     const lastAutoAcctDate = useRef('');
     useEffect(() => {
         if (!hasClassField) return;
@@ -100,8 +112,27 @@ export function EventFormBase({
             if (conv) setField('convention', conv);
         }
         const rowBonus = row && row.bonusPct !== undefined && row.bonusPct !== '' ? Number(row.bonusPct) : null;
-        const bonus = /no bonus/i.test(formData.assetClass || '') ? 0 : (rowBonus ?? bonusPctForDate(pis));
+        const bonus = /no bonus/i.test(formData.assetClass || '') ? 0 : (rowBonus ?? pctForDate(bonusDate));
         if (bonus !== null && Number.isFinite(bonus)) setField('bonusPct', String(bonus));
+        // Customize Table (Bonus Depreciation) wins when a rule matches Book / Company /
+        // Asset Class / PIS year; the value stays editable afterwards.
+        let stale = false;
+        const fallbackNote = bonusDateIsFallback ? `No Placed-In-Service Date yet — using ${bonusDate.slice(0, 4)}; updates when you enter it` : '';
+        setBonusNote(fallbackNote);
+        configApi.resolveBonusPct({ book: formData.book || '', company: formData.company || '', assetType: formData.assetClass || '', date: bonusDate })
+            .then((r) => {
+                if (stale) return;
+                if (r && r.source === 'custom' && Number.isFinite(Number(r.pct))) {
+                    setField('bonusPct', String(r.pct));
+                    const who = [r.rule?.book, r.rule?.company, r.rule?.assetType].filter(Boolean).join(' · ') || 'all assets';
+                    setBonusNote(`From Customize Table (${who}; ${r.rule?.yearLabel || 'matching period'}) — editable${bonusDateIsFallback ? `. Using ${bonusDate.slice(0, 4)} until you enter the Placed-In-Service Date` : ''}`);
+                } else if (r?.checked) {
+                    // Shows exactly what was compared, so a missing match is easy to spot.
+                    const c = r.checked;
+                    setBonusNote(`No Customize Table row matched (Book: ${c.book || '—'} · Company: ${c.company || '—'} · Asset Class: ${c.assetType || '—'} · Date: ${c.date}; ${c.activeRows} active row${c.activeRows === 1 ? '' : 's'} checked) — using the Default Table.${c.loadError ? ` Server could not read the table: ${c.loadError}.` : ''} ${fallbackNote}`.trim());
+                }
+            })
+            .catch(() => { if (!stale) setBonusNote('Could not check the Customize Table — restart the server so it has the latest code.'); });
         if (/^\d{4}-\d{2}-\d{2}$/.test(pis || '')) {
             const q = Math.floor((Number(pis.slice(5, 7)) - 1) / 3);
             setField('quarter', QUARTER_OPTIONS[q]);
@@ -110,8 +141,9 @@ export function EventFormBase({
                 setField('accountingPeriodDate', pis);
             }
         }
+        return () => { stale = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.assetClass, pis, assetClassRows, classHistory]);
+    }, [formData.assetClass, formData.book, formData.company, pis, bonusDate, assetClassRows, classHistory, bonusRules]);
     return (<>
       <div className="grid grid-2">
         <div className="card card-pad">
@@ -131,7 +163,7 @@ export function EventFormBase({
                     return (<Input key={field.key} label={field.label} value={formData[field.key] ?? ''} readOnly placeholder="—" hint={field.hint}/>);
                 }
                 if (field.type === 'select') {
-                    return (<Select key={field.key} label={field.label} placeholder={field.placeholder} value={formData[field.key] ?? ''} onChange={(v) => (field.optionsSource === 'assetClasses' ? handleAssetClassChange(v) : setField(field.key, v))} options={field.optionsSource === 'assetClasses' ? assetClassNames : field.options} hint={field.hint}/>);
+                    return (<Select key={field.key} label={field.label} placeholder={field.placeholder} value={formData[field.key] ?? ''} onChange={(v) => (field.optionsSource === 'assetClasses' ? handleAssetClassChange(v) : setField(field.key, v))} options={field.optionsSource === 'assetClasses' ? assetClassNames : field.optionsSource === 'books' ? bookNames : field.options} hint={field.hint}/>);
                 }
                 if (field.type === 'checkbox') {
                     return (<div className="form-row" key={field.key}>
@@ -139,7 +171,7 @@ export function EventFormBase({
                         <input id={`lc-${field.key}`} type="checkbox" checked={!!formData[field.key]} onChange={(e) => setField(field.key, e.target.checked)}/>
                       </div>);
                 }
-                return (<Input key={field.key} label={field.label} type={field.type} value={formData[field.key] ?? ''} placeholder={field.placeholder} hint={field.hint} onChange={(e) => setField(field.key, e.target.value)}/>);
+                return (<Input key={field.key} label={field.label} type={field.type} value={formData[field.key] ?? ''} placeholder={field.placeholder} hint={field.key === 'bonusPct' && bonusNote ? bonusNote : field.hint} onChange={(e) => setField(field.key, e.target.value)}/>);
             })}
           </div>
           <div className="flex gap-2 mt-2">

@@ -14,69 +14,49 @@
  * Each event type gets its own box set instead of one shared form.
  */
 
-export const ASSET_TYPE_OPTIONS = [
-  'Personal Property 3yr MACRS 200% DB (GDS)',
-  'Personal Property 5yr MACRS 200% DB (GDS)',
-  'Personal Property 7yr MACRS 200% DB (GDS)',
-  'Personal Property 10yr MACRS 200% DB (GDS)',
-  'Personal Property 15yr MACRS 150% DB (GDS)',
-  'Personal Property 20yr MACRS 150% DB (GDS)',
-  'Residential Rental 27.5yr SL Mid-Month (GDS)',
-  'Nonresidential Real 31.5yr SL Mid-Month (GDS)',
-  'Nonresidential Real 39yr SL Mid-Month (GDS)',
-  'Personal Property 3yr 150% DB (GDS)',
-  'Personal Property 5yr 150% DB (GDS)',
-  'Personal Property 7yr 150% DB (GDS)',
-  'Personal Property 10yr 150% DB (GDS)',
-  'Personal Property 3yr SL (ADS)',
-  'Personal Property 5yr SL (ADS)',
-  'Personal Property 9yr SL (ADS)',
-  'Personal Property 10yr SL (ADS)',
-  'Personal Property 12yr SL (ADS)',
-  'Personal Property 20yr SL (ADS)',
-  'Personal Property 25yr SL (ADS)',
-  'Residential Rental 30yr SL Mid-Month (ADS)',
-  'Nonresidential Real 40yr SL Mid-Month (ADS)',
-  'Personal Property 5yr MACRS (WBC)',
-  'Personal Property 5yr MACRS (UK - 57)',
-  'Book Only — No Depreciation'
-];
+// Dropdown choices below are filled IN PLACE from the database by hydrateFormOptions()
+// (GET /api/config/form-options -> asset_type_config + form_option_lists). They start empty.
+export const ASSET_TYPE_OPTIONS = [];
 
-export const RATE_TABLE_OPTIONS = [
-  '— Auto (based on life/convention) —',
-  'MACRS Table A-1 HY 200% DB — 5 Year',
-  'MACRS Table A-1 HY 200% DB — 7 Year',
-  'MACRS Table A-1 HY 200% DB — 3 Year',
-  'MACRS Table A-1 HY 200% DB — 10 Year',
-  'MACRS Table A-1 HY 200% DB — 15 Year',
-  'MACRS Table A-1 HY 200% DB — 20 Year',
-  'MACRS Table A-2 MQ Q1 200% DB',
-  'MACRS Table A-3 MQ Q2 200% DB',
-  'MACRS Table A-4 MQ Q3 200% DB',
-  'MACRS Table A-5 MQ Q4 200% DB',
-  'MACRS 150% DB Half-Year (State AMT)',
-  'MACRS Table A-6 Residential 27.5yr Mid-Month',
-  'MACRS Table A-7a Nonresidential 39yr Mid-Month',
-  'Nonresidential Real Property SL 40yr Mid-Month',
-  'Straight Line, Full-Month Convention',
-  'ADS 3-Year SL Half-Year',
-  'ADS 5-Year SL Half-Year',
-  'ADS 9-Year SL Half-Year',
-  'ADS 10-Year SL Half-Year',
-  'ADS 12-Year SL Half-Year',
-  'ADS 20-Year SL Half-Year',
-  'ADS 25-Year SL Half-Year',
-  'ADS 30-Year Residential SL Mid-Month',
-  'ADS 40-Year Nonresidential SL Mid-Month',
-  'Straight Line (No Bonus) Half-Year'
-];
+export const RATE_TABLE_OPTIONS = [];
 
 export const QUARTER_OPTIONS = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'];
-export const METHOD_OPTIONS = ['MACRS', 'MACRS ADS', 'SL', 'MACRS Straight-Line', 'MACRS 150DB'];
+export const METHOD_OPTIONS = [];
+export const CONVENTION_OPTIONS = {
+  addition: [],
+  adjustment: [],
+  retirement: [],
+  transfer: [],
+  reinstatement: [],
+  reclassification: []
+};
+
+// ======================================================
+// Function : hydrateFormOptions
+// Purpose  : Fills the option arrays above in place from the server's
+//            { assetType, rateTable, method, conventionAddition, ... } lists.
+//            In place on purpose: FIELD_SCHEMAS (and utils/csv.js) hold these
+//            same array objects, so every consumer sees the DB values.
+// ======================================================
+
+export function hydrateFormOptions(lists) {
+  const fill = (arr, vals) => { if (Array.isArray(vals) && vals.length) arr.splice(0, arr.length, ...vals); };
+  fill(ASSET_TYPE_OPTIONS, lists?.assetType);
+  fill(RATE_TABLE_OPTIONS, lists?.rateTable);
+  fill(METHOD_OPTIONS, lists?.method);
+  fill(CONVENTION_OPTIONS.addition, lists?.conventionAddition);
+  fill(CONVENTION_OPTIONS.adjustment, lists?.conventionAdjustment);
+  fill(CONVENTION_OPTIONS.retirement, lists?.conventionRetirement);
+  fill(CONVENTION_OPTIONS.transfer, lists?.conventionTransfer);
+  fill(CONVENTION_OPTIONS.reinstatement, lists?.conventionReinstatement);
+  fill(CONVENTION_OPTIONS.reclassification, lists?.conventionReclassification);
+}
 
 /** Per-card field list. `key` is what lands in formData / gets posted to the API. */
 export const FIELD_SCHEMAS = {
   addition: [
+    { key: 'book', label: 'Book', type: 'select', options: [], optionsSource: 'books', placeholder: '— Select book —', hint: 'Used to pick the Bonus % from Configuration → Bonus Depreciation → Customize Table' },
+    { key: 'company', label: 'Company', type: 'select', options: ['5B', 'R9', '2D', 'GD'], placeholder: '— Select company —', hint: 'Used to pick the Bonus % from the Customize Table' },
     { key: 'assetType', label: 'Asset Type', type: 'select', options: ASSET_TYPE_OPTIONS },
     { key: 'assetClass', label: 'Asset Class', type: 'select', options: [], optionsSource: 'assetClasses', placeholder: '— Select asset class —', hint: 'Options come from Configuration → Asset Classes (database).' },
     { key: 'propertyType', label: 'Property Type', type: 'readonly', hint: 'Auto-filled from the selected Asset Class' },
@@ -86,9 +66,9 @@ export const FIELD_SCHEMAS = {
     { key: 'placedInService', label: 'Placed-In-Service Date', type: 'date' },
     { key: 'lifeMonths', label: 'Life (Months)', type: 'number', hint: 'Auto-filled from the selected Asset Class' },
     { key: 'rateTable', label: 'Rate Table', type: 'select', options: RATE_TABLE_OPTIONS },
-    { key: 'convention', label: 'Convention', type: 'select', options: ['HY (Half-Year)', 'MQ (Mid-Quarter)', 'Mid-Month', 'Full-Month'] },
+    { key: 'convention', label: 'Convention', type: 'select', options: CONVENTION_OPTIONS.addition },
     { key: 'quarter', label: 'Quarter Placed in Service', type: 'select', options: QUARTER_OPTIONS },
-    { key: 'bonusPct', label: 'Bonus %', type: 'number', hint: 'Auto-filled from the selected Asset Class (Bonus % column); editable' },
+    { key: 'bonusPct', label: 'Bonus %', type: 'number', hint: 'Auto-filled by year: a matching Customize Table row (Book / Company / Asset Class + Placed-In-Service year) wins, else the Asset Class row, else the Default Table. Editable' },
     { key: 'electOutBonus', label: 'Elect Out Bonus', type: 'checkbox' },
     { key: 'accountingPeriodDate', label: 'Accounting Period Date', type: 'date' }
   ],
@@ -103,7 +83,7 @@ export const FIELD_SCHEMAS = {
     { key: 'adjustmentAmount', label: 'Adjustment Amount (+/-)', type: 'number', placeholder: 'e.g. 519134.02 or -813708.14' },
     { key: 'effectiveDate', label: 'Effective Date', type: 'date' },
     { key: 'accountingPeriodDate', label: 'Accounting Period Date', type: 'date' },
-    { key: 'convention', label: 'Convention', type: 'select', options: ['HY (Half-Year)', 'MQ (Mid-Quarter)', 'Mid-Month'] },
+    { key: 'convention', label: 'Convention', type: 'select', options: CONVENTION_OPTIONS.adjustment },
     { key: 'quarter', label: 'Quarter Placed in Service', type: 'select', options: QUARTER_OPTIONS },
     { key: 'bonusPct', label: 'Bonus %', type: 'number', hint: 'Auto from PISD/type' },
     { key: 'electOutBonus', label: 'Elect Out Bonus', type: 'checkbox' }
@@ -114,7 +94,7 @@ export const FIELD_SCHEMAS = {
     { key: 'cost', label: 'Asset Cost', type: 'number', placeholder: 'e.g. 120000' },
     { key: 'placedInService', label: 'Placed-In-Service Date (PISD)', type: 'date' },
     { key: 'recoveryPeriodYears', label: 'Recovery Period (Years)', type: 'number', hint: 'Auto from asset type' },
-    { key: 'convention', label: 'Convention', type: 'select', options: ['HY (Half-Year)', 'MQ (Mid-Quarter)', 'MM (Mid-Month)'] },
+    { key: 'convention', label: 'Convention', type: 'select', options: CONVENTION_OPTIONS.retirement },
     { key: 'quarter', label: 'Quarter Placed in Service', type: 'select', options: QUARTER_OPTIONS },
     { key: 'bonusPct', label: 'Bonus % (at addition)', type: 'number', hint: 'Auto from PISD/type' },
     { key: 'boyAccumDepr', label: 'BOY Accumulated Depr.', type: 'number', placeholder: 'e.g. 62400' },
@@ -132,7 +112,7 @@ export const FIELD_SCHEMAS = {
     { key: 'placedInService', label: 'PISD', type: 'date' },
     { key: 'lifeMonths', label: 'Life (Months)', type: 'number' },
     { key: 'monthlyDeprRate', label: 'Monthly Depr Rate', type: 'number' },
-    { key: 'convention', label: 'Convention', type: 'select', options: ['HY', 'MQ', 'Mid-Month'] },
+    { key: 'convention', label: 'Convention', type: 'select', options: CONVENTION_OPTIONS.transfer },
     { key: 'bonusPct', label: 'Bonus %', type: 'number' },
     { key: 'costTransferred', label: 'Cost Transferred', type: 'number' },
     { key: 'transferDate', label: 'Transfer Date', type: 'date' },
@@ -151,7 +131,7 @@ export const FIELD_SCHEMAS = {
     { key: 'originalDisposalDate', label: 'Original Disposal Date', type: 'date' },
     { key: 'originalADAtDisposal', label: 'A/D at Disposal', type: 'number' },
     { key: 'originalGainLoss', label: 'Original Gain/Loss', type: 'number' },
-    { key: 'convention', label: 'Convention', type: 'select', options: ['HY (Half-Year)', 'MQ (Mid-Quarter)', 'Mid-Month'] },
+    { key: 'convention', label: 'Convention', type: 'select', options: CONVENTION_OPTIONS.reinstatement },
     { key: 'bonusPct', label: 'Bonus % (at addition)', type: 'number', hint: 'Auto from PISD/type' },
     { key: 'reinstatementDate', label: 'Reinstatement Date', type: 'date' },
     { key: 'accountingPeriodDate', label: 'Accounting Period', type: 'date' }
@@ -164,12 +144,12 @@ export const FIELD_SCHEMAS = {
     { key: 'oldAssetType', label: 'Old Asset Type', type: 'text', placeholder: 'e.g. EQUIP-5YR' },
     { key: 'oldMethod', label: 'Old Method', type: 'select', options: METHOD_OPTIONS },
     { key: 'oldLifeMonths', label: 'Old Life (Months)', type: 'number' },
-    { key: 'oldConvention', label: 'Old Convention', type: 'select', options: ['HY', 'MQ', 'Mid-Month'] },
+    { key: 'oldConvention', label: 'Old Convention', type: 'select', options: CONVENTION_OPTIONS.reclassification },
     { key: 'oldBonusPct', label: 'Old Bonus %', type: 'number' },
     { key: 'newAssetType', label: 'New Asset Type', type: 'text', placeholder: 'e.g. EQUIP-5YR-BONUS' },
     { key: 'newMethod', label: 'New Method', type: 'select', options: METHOD_OPTIONS },
     { key: 'newLifeMonths', label: 'New Life (Months)', type: 'number' },
-    { key: 'newConvention', label: 'New Convention', type: 'select', options: ['HY', 'MQ', 'Mid-Month'] },
+    { key: 'newConvention', label: 'New Convention', type: 'select', options: CONVENTION_OPTIONS.reclassification },
     { key: 'newBonusPct', label: 'New Bonus %', type: 'number' },
     { key: 'effectiveDate', label: 'Effective Date', type: 'date' },
     { key: 'accountingPeriodDate', label: 'Accounting Period', type: 'date' }
