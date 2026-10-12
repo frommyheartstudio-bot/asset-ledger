@@ -13,6 +13,7 @@ import { authRouter } from './routes/auth.js';
 import { chatRouter } from './routes/chat.js';
 import { agentRouter } from './routes/agent.js';
 import { lifecycleRouter } from './routes/lifecycle.js';
+import { serviceRouter } from './routes/service.js';
 import { modelingRouter } from './routes/modeling.js';
 import { initStore, persistNow } from './data/assets.js';
 import { initAssetTypeConfig } from './services/assetTypeConfig.js';
@@ -34,6 +35,11 @@ const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 app.use(cors());
+
+// Machine-to-machine API (API-key protected, own bigger JSON limit) — mounted
+// BEFORE the global express.json() so its larger body limit applies.
+app.use('/api/service', serviceRouter);
+
 app.use(express.json());
 
 app.get('/api/health', async (_req, res) => {

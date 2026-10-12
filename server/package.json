@@ -13,7 +13,8 @@
     "db:seed": "psql \"$DATABASE_URL\" -f db/config-tables.sql && psql \"$DATABASE_URL\" -f db/asset-type-config.sql && psql \"$DATABASE_URL\" -f db/rate-tables.sql && psql \"$DATABASE_URL\" -f db/seed-asset-classes.sql && psql \"$DATABASE_URL\" -f db/seed-admin.sql && psql \"$DATABASE_URL\" -f db/seed-activity.sql",
     "db:seed:assets": "tsx --env-file=.env scripts/migrate-to-postgres.ts db/seed-assets.json",
     "test:engine": "tsx --env-file=.env scripts/run-engine-tests.ts",
-    "db:check": "tsx --env-file=.env scripts/check-postgres.ts"
+    "db:check": "tsx --env-file=.env scripts/check-postgres.ts",
+    "service-account": "tsx --env-file=.env scripts/service-accounts.ts"
   },
   "dependencies": {
     "pg": "^8.13.1",

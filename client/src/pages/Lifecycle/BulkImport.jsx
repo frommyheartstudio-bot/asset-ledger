@@ -62,6 +62,7 @@ export function BulkImport() {
           <h1>Bulk Import Lifecycle Events</h1>
           <p>Upload a CSV per event type to post many transactions at once — or use Master Data Set to mix any assets and any event types in one CSV.</p>
         </div>
+        <Button variant="ghost" to="/lifecycle/service-api">Test Service API →</Button>
       </div>
 
       <div className="grid grid-2">

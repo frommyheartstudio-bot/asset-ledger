@@ -9,6 +9,7 @@
 // ======================================================
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE = BASE;
 // ======================================================
 // Function : request
 // Purpose  : Implements logic for 'request'

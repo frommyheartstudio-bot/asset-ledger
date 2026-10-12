@@ -3,7 +3,7 @@
 // Purpose   : API client functions for lifecycle.api
 // ======================================================
 
-import { api } from './client';
+import { api, API_BASE } from './client';
 
 // ======================================================
 // START: API Client Functions
@@ -26,7 +26,18 @@ export const lifecycleApi = {
     getTransactions: (assetNumber) => api.get(`/lifecycle/transactions/${assetNumber}`),
     // Posted transactions for EVERY asset, newest first — powers the
     // Asset Register page's "Posted Lifecycle Events" table.
-    getAllTransactions: (limit = 200) => api.get(`/lifecycle/transactions?limit=${limit}`)
+    getAllTransactions: (limit = 200) => api.get(`/lifecycle/transactions?limit=${limit}`),
+    // Service API test page — calls the machine-to-machine endpoint with an
+    // x-api-key header. Returns { status, ok, body } instead of throwing, so
+    // the page can show 401 / 413 / 503 responses as they really come back.
+    serviceBulkImport: async (apiKey, input) => {
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['x-api-key'] = apiKey;
+        const res = await fetch(`${API_BASE}/service/lifecycle/bulk-import`, { method: 'POST', headers, body: JSON.stringify(input) });
+        let body = null;
+        try { body = await res.json(); } catch { /* non-JSON body */ }
+        return { status: res.status, ok: res.ok, body };
+    }
 };
 
 // ======================================================

@@ -249,29 +249,25 @@ lifecycleRouter.post('/post', async (req, res) => {
   }
 });
 
-// POST /api/lifecycle/bulk-import — Bulk Import page's "Import All" click.
-// Body: { eventType: <label, e.g. 'Addition'>, rows: [{ assetNumber, fields }, ...] }
-// (all rows share one event type — the Bulk Import page renders one card,
-// and therefore one CSV, per event type). Runs the exact same
-// preview -> Postgres insert -> applyLifecycleEvent pipeline as the
-// single-row /preview + /post endpoints, just looped per row, so a bulk
-// import produces the same ledger rows and Asset Register updates a
-// manual post would. One row failing (bad data, unknown asset, etc.)
-// does not stop the rest of the batch — each row's outcome comes back
-// individually so the UI can flag just the failed ones.
-lifecycleRouter.post('/bulk-import', async (req, res) => {
-  const body = req.body as { eventType?: string; postedBy?: string; rows?: Array<{ assetNumber?: string; fields?: Record<string, unknown> }> };
+export type BulkImportRow = { assetNumber?: string; fields?: Record<string, unknown> };
+export type BulkImportResult = { assetNumber: string; status: 'posted' | 'failed'; error?: string };
 
-  if (!body.eventType || !Array.isArray(body.rows) || body.rows.length === 0) {
-    res.status(400).json({ error: 'eventType and a non-empty rows array are required' });
-    return;
-  }
+// ======================================================
+// Function : runBulkImport
+// Purpose  : The row-by-row posting loop behind /bulk-import, pulled out so
+//            the service (machine-to-machine) endpoint runs the EXACT same
+//            pipeline as the Bulk Import page. One row failing never stops
+//            the rest — each row's outcome is returned individually.
+// ======================================================
 
-  const results: Array<{ assetNumber: string; status: 'posted' | 'failed'; error?: string }> = [];
-  const eventType = body.eventType as LifecyclePreviewInput['eventType'];
-  const postedBy = body.postedBy?.trim() || 'system';
+export async function runBulkImport(
+  eventType: LifecyclePreviewInput['eventType'],
+  rows: BulkImportRow[],
+  postedBy: string
+): Promise<BulkImportResult[]> {
+  const results: BulkImportResult[] = [];
 
-  for (const row of body.rows) {
+  for (const row of rows) {
     const assetNumber = row.assetNumber ?? '';
     if (!assetNumber.trim()) {
       results.push({ assetNumber, status: 'failed', error: 'Missing Asset Number' });
@@ -304,37 +300,47 @@ lifecycleRouter.post('/bulk-import', async (req, res) => {
     }
   }
 
-  res.json({ results });
-});
+  return results;
+}
 
-// POST /api/lifecycle/bulk-post — Master Data Set page's "Post All" click.
-// Body: { rows: [{ eventType: <label>, assetNumber, fields }, ...] }
-// Unlike /bulk-import (one eventType shared by every row, CSV-driven), each
-// row here carries its OWN eventType — that's what lets one request cover
-// both Master Data Set modes:
-//   • "Same Transaction -> Many Assets": every row shares eventType, differs
-//     by assetNumber (fields are identical across rows, set once on screen).
-//   • "Multiple Transactions -> One Asset": every row shares assetNumber,
-//     differs by eventType + fields (several event cards queued for one
-//     asset, posted together).
-// Runs the exact same preview -> Postgres insert -> applyLifecycleEvent
-// pipeline as /bulk-import, just keyed per row instead of per file. One
-// row failing does not stop the rest — each row's outcome comes back
+// POST /api/lifecycle/bulk-import — Bulk Import page's "Import All" click.
+// Body: { eventType: <label, e.g. 'Addition'>, rows: [{ assetNumber, fields }, ...] }
+// (all rows share one event type — the Bulk Import page renders one card,
+// and therefore one CSV, per event type). Runs the exact same
+// preview -> Postgres insert -> applyLifecycleEvent pipeline as the
+// single-row /preview + /post endpoints, just looped per row, so a bulk
+// import produces the same ledger rows and Asset Register updates a
+// manual post would. One row failing (bad data, unknown asset, etc.)
+// does not stop the rest of the batch — each row's outcome comes back
 // individually so the UI can flag just the failed ones.
-lifecycleRouter.post('/bulk-post', async (req, res) => {
-  const body = req.body as {
-    postedBy?: string;
-    rows?: Array<{ eventType?: string; assetNumber?: string; fields?: Record<string, unknown> }>;
-  };
+lifecycleRouter.post('/bulk-import', async (req, res) => {
+  const body = req.body as { eventType?: string; postedBy?: string; rows?: BulkImportRow[] };
 
-  if (!Array.isArray(body.rows) || body.rows.length === 0) {
-    res.status(400).json({ error: 'a non-empty rows array is required' });
+  if (!body.eventType || !Array.isArray(body.rows) || body.rows.length === 0) {
+    res.status(400).json({ error: 'eventType and a non-empty rows array are required' });
     return;
   }
 
-  const postedBy = body.postedBy?.trim() || 'system';
-  type BulkPostResult = { assetNumber: string; eventType: string; status: 'posted' | 'failed'; error?: string };
-  const results: BulkPostResult[] = new Array(body.rows.length);
+  const results = await runBulkImport(
+    body.eventType as LifecyclePreviewInput['eventType'],
+    body.rows,
+    body.postedBy?.trim() || 'system'
+  );
+  res.json({ results });
+});
+
+export type BulkPostRow = { eventType?: string; assetNumber?: string; fields?: Record<string, unknown> };
+export type BulkPostResult = { assetNumber: string; eventType: string; status: 'posted' | 'failed'; error?: string };
+
+// ======================================================
+// Function : runBulkPost
+// Purpose  : The mixed-event-type posting loop behind /bulk-post, pulled
+//            out so the service endpoint shares the exact same logic
+//            (Additions first, results returned in original row order).
+// ======================================================
+
+export async function runBulkPost(rows: BulkPostRow[], postedBy: string): Promise<BulkPostResult[]> {
+  const results: BulkPostResult[] = new Array(rows.length);
 
   // A mixed file (e.g. asset 01 Addition, asset 02 Retirement, asset 02
   // Adjustment) can list rows in any order. Process every Addition FIRST
@@ -344,7 +350,7 @@ lifecycleRouter.post('/bulk-post', async (req, res) => {
   // and the real Addition would then be rejected by the one-Addition rule.
   // Results are still returned in the ORIGINAL row order so the UI can map
   // each outcome back to its CSV line.
-  const order = body.rows
+  const order = rows
     .map((row, index) => ({ row, index, first: isAddition(row.eventType) ? 0 : 1 }))
     .sort((x, y) => x.first - y.first || x.index - y.index);
 
@@ -388,6 +394,32 @@ lifecycleRouter.post('/bulk-post', async (req, res) => {
     }
   }
 
+  return results;
+}
+
+// POST /api/lifecycle/bulk-post — Master Data Set page's "Post All" click.
+// Body: { rows: [{ eventType: <label>, assetNumber, fields }, ...] }
+// Unlike /bulk-import (one eventType shared by every row, CSV-driven), each
+// row here carries its OWN eventType — that's what lets one request cover
+// both Master Data Set modes:
+//   • "Same Transaction -> Many Assets": every row shares eventType, differs
+//     by assetNumber (fields are identical across rows, set once on screen).
+//   • "Multiple Transactions -> One Asset": every row shares assetNumber,
+//     differs by eventType + fields (several event cards queued for one
+//     asset, posted together).
+// Runs the exact same preview -> Postgres insert -> applyLifecycleEvent
+// pipeline as /bulk-import, just keyed per row instead of per file. One
+// row failing does not stop the rest — each row's outcome comes back
+// individually so the UI can flag just the failed ones.
+lifecycleRouter.post('/bulk-post', async (req, res) => {
+  const body = req.body as { postedBy?: string; rows?: BulkPostRow[] };
+
+  if (!Array.isArray(body.rows) || body.rows.length === 0) {
+    res.status(400).json({ error: 'a non-empty rows array is required' });
+    return;
+  }
+
+  const results = await runBulkPost(body.rows, body.postedBy?.trim() || 'system');
   res.json({ results });
 });
 
@@ -419,17 +451,51 @@ type TransactionRow = {
 //            capped at `limit` (Asset Register → Posted Lifecycle Events).
 // ======================================================
 
-async function fetchLifecycleTransactions(options: { assetNumber?: string; limit?: number }) {
-  const params: unknown[] = [];
-  let whereClause = '';
-  let limitClause = '';
+export type TransactionFilter = {
+  assetNumber?: string;      // one asset
+  assetNumbers?: string[];   // any of these assets (Service API company scoping)
+  eventType?: string;        // 'Addition' etc. (case-insensitive)
+  since?: Date;              // posted at or after
+  until?: Date;              // posted before
+  postedBy?: string;         // exact posted_by (e.g. 'svc:erp')
+  limit?: number;
+  offset?: number;
+};
 
-  if (options.assetNumber) {
-    params.push(options.assetNumber);
-    whereClause = `WHERE asset_number = $${params.length}`;
-  } else {
-    params.push(Math.min(options.limit ?? 200, 1000));
+// Builds the WHERE clause + params shared by the list and count queries.
+function buildTransactionWhere(options: TransactionFilter): { where: string; params: unknown[] } {
+  const params: unknown[] = [];
+  const clauses: string[] = [];
+  const add = (sql: string, value: unknown) => { params.push(value); clauses.push(sql.replace('?', `$${params.length}`)); };
+
+  if (options.assetNumber) add('asset_number = ?', options.assetNumber);
+  if (options.assetNumbers) add('asset_number = ANY(?::text[])', options.assetNumbers);
+  if (options.eventType) add('lower(event_type) = ?', options.eventType.toLowerCase());
+  if (options.since) add('posted_at >= ?', options.since);
+  if (options.until) add('posted_at < ?', options.until);
+  if (options.postedBy) add('posted_by = ?', options.postedBy);
+
+  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
+}
+
+export async function countLifecycleTransactions(options: TransactionFilter): Promise<number> {
+  const { where, params } = buildTransactionWhere(options);
+  const result = await pool.query<{ n: string | number }>(`SELECT count(*) AS n FROM asset_transactions ${where}`, params);
+  return Number(result.rows[0]?.n ?? 0);
+}
+
+export async function fetchLifecycleTransactions(options: TransactionFilter) {
+  const { where, params } = buildTransactionWhere(options);
+
+  // One asset's tab is unbounded (as before); every other list is capped.
+  let limitClause = '';
+  if (options.limit !== undefined || !options.assetNumber) {
+    params.push(Math.min(Math.max(options.limit ?? 200, 1), 1000));
     limitClause = `LIMIT $${params.length}`;
+    if (options.offset) {
+      params.push(Math.max(options.offset, 0));
+      limitClause += ` OFFSET $${params.length}`;
+    }
   }
 
   const result = await pool.query<TransactionRow>(
@@ -447,8 +513,8 @@ async function fetchLifecycleTransactions(options: { assetNumber?: string; limit
        extract(epoch FROM posted_at) AS posted_at_ts,
        posted_by
      FROM asset_transactions
-     ${whereClause}
-     ORDER BY posted_at DESC
+     ${where}
+     ORDER BY posted_at DESC, transaction_id DESC
      ${limitClause}`,
     params
   );
