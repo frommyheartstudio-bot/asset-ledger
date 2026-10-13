@@ -40,6 +40,10 @@ export const NAV = [
             { id: 'books', icon: '📚', label: 'Books List', href: '/configuration/books', capability: 'editConfig' }
         ]
     },
+    {
+        group: 'Integrations',
+        items: [{ id: 'sap', icon: '⇄', label: 'SAP', href: '/integrations/sap', capability: 'postEvents' }]
+    },
     { group: 'Administration', items: [{ id: 'users', icon: '◍', label: 'User Management', href: '/users', capability: 'manageUsers' }] }
 ];
 

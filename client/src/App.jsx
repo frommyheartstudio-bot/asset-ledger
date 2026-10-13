@@ -11,6 +11,7 @@ import { AssetDetail } from './pages/Assets/AssetDetail';
 import { LifecycleEvents } from './pages/Lifecycle/LifecycleEvents';
 import { BulkImport } from './pages/Lifecycle/BulkImport';
 import { ServiceApiTest } from './pages/Lifecycle/ServiceApiTest';
+import { SapIntegration } from './pages/Integrations/SapIntegration';
 import { Modeling } from './pages/Planning/Modeling';
 import { Forecasting } from './pages/Planning/Forecasting';
 import { Reporting } from './pages/Compliance/Reporting';
@@ -45,6 +46,7 @@ export default function App() {
       <Route path="/lifecycle" element={<ProtectedRoute><RequireView menuId="lifecycle"><LifecycleEvents /></RequireView></ProtectedRoute>}/>
       <Route path="/lifecycle/bulk-import" element={<ProtectedRoute><RequireView menuId="bulk-import"><BulkImport /></RequireView></ProtectedRoute>}/>
       <Route path="/lifecycle/service-api" element={<ProtectedRoute><RequireView menuId="bulk-import"><ServiceApiTest /></RequireView></ProtectedRoute>}/>
+      <Route path="/integrations/sap" element={<ProtectedRoute><RequireView menuId="sap"><SapIntegration /></RequireView></ProtectedRoute>}/>
       <Route path="/modeling" element={<ProtectedRoute><RequireView menuId="modeling"><Modeling /></RequireView></ProtectedRoute>}/>
       <Route path="/forecasting" element={<ProtectedRoute><RequireView menuId="forecasting"><Forecasting /></RequireView></ProtectedRoute>}/>
       <Route path="/reporting" element={<ProtectedRoute><RequireView menuId="reporting"><Reporting /></RequireView></ProtectedRoute>}/>

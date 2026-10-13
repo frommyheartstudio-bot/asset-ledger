@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 // clicked, instead of always showing their items. Every other group
 // (Overview, Asset Management, Administration) keeps the old
 // always-expanded behavior.
-const COLLAPSIBLE_GROUPS = ['Planning', 'Compliance', 'Configuration'];
+const COLLAPSIBLE_GROUPS = ['Planning', 'Compliance', 'Configuration', 'Integrations'];
 
 /** open/onClose control the off-canvas state on mobile/tablet (<1001px); ignored/no-op on desktop. */
 // ======================================================
