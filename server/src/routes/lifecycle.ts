@@ -7,6 +7,8 @@ import { Router } from 'express';
 import { calculateLifecyclePreview } from '../services/depreciation.js';
 import { pool } from '../db/postgres.js';
 import { applyLifecycleEvent, findAsset } from '../data/assets.js';
+import { fillFromRegister } from '../services/registerPrefill.js';
+import { getEngineAssetConfig } from '../services/assetTypeConfig.js';
 import type { LifecyclePreviewInput, LifecyclePreviewResult } from '../types.js';
 
 
@@ -277,7 +279,8 @@ export async function runBulkImport(
       const input: LifecyclePreviewInput = {
         eventType,
         assetNumber,
-        fields: (row.fields ?? {}) as LifecyclePreviewInput['fields']
+        // blank fields are filled from the Asset Register (never overwrites what the caller sent)
+        fields: fillFromRegister(eventType, findAsset(assetNumber.trim()), (row.fields ?? {}) as Record<string, unknown>, getEngineAssetConfig()) as LifecyclePreviewInput['fields']
       };
       const preview = calculateLifecyclePreview(input);
 
@@ -371,7 +374,8 @@ export async function runBulkPost(rows: BulkPostRow[], postedBy: string): Promis
       const input: LifecyclePreviewInput = {
         eventType,
         assetNumber,
-        fields: (row.fields ?? {}) as LifecyclePreviewInput['fields']
+        // blank fields are filled from the Asset Register (never overwrites what the caller sent)
+        fields: fillFromRegister(eventType, findAsset(assetNumber.trim()), (row.fields ?? {}) as Record<string, unknown>, getEngineAssetConfig()) as LifecyclePreviewInput['fields']
       };
       const preview = calculateLifecyclePreview(input);
 

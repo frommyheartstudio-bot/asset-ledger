@@ -14,12 +14,15 @@
     "db:seed:assets": "tsx --env-file=.env scripts/migrate-to-postgres.ts db/seed-assets.json",
     "test:engine": "tsx --env-file=.env scripts/run-engine-tests.ts",
     "db:check": "tsx --env-file=.env scripts/check-postgres.ts",
-    "service-account": "tsx --env-file=.env scripts/service-accounts.ts"
+    "service-account": "tsx --env-file=.env scripts/service-accounts.ts",
+    "test": "vitest run",
+    "test:calc": "vitest run tests/calc-engine.test.ts",
+    "test:api": "vitest run tests/service-api.test.ts tests/lifecycle-api.test.ts"
   },
   "dependencies": {
-    "pg": "^8.13.1",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -27,6 +30,7 @@
     "@types/node": "^20.14.10",
     "@types/pg": "^8.11.10",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^3.2.7"
   }
 }
