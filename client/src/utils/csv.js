@@ -209,6 +209,29 @@ export function buildUnifiedTemplateCsv() {
 }
 
 // ======================================================
+// Function : buildUnifiedRowsCsv
+// Purpose  : Master Data Set CSV text from converted rows
+//            ({ assetNumber, eventType, fields }) — same columns as the
+//            Bulk Import template, so the file can be uploaded straight
+//            into Bulk Import -> Master Data Set. Cells containing
+//            commas/quotes/newlines are quoted.
+// ======================================================
+
+export function buildUnifiedRowsCsv(rows) {
+    const headers = getUnifiedHeaders();
+    const cell = (v) => {
+        const s = v === undefined || v === null ? '' : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = rows.map((r) => headers.map((h) => {
+        if (h === 'assetNumber') return cell(r.assetNumber);
+        if (h === 'eventType') return cell(r.eventType);
+        return cell(r.fields?.[h]);
+    }).join(','));
+    return [headers.join(','), ...lines].join('\n') + '\n';
+}
+
+// ======================================================
 // Function : downloadCsv
 // Purpose  : Triggers a browser download of CSV text as a file.
 // ======================================================

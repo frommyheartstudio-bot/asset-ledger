@@ -1,9 +1,10 @@
 // ======================================================
 // File Name : SapIntegration.jsx
-// Purpose   : Integrations -> SAP. Pull flow: click "Fetch from SAP",
+// Purpose   : Integrations -> SAP. PULL-ONLY flow: click "Fetch from SAP",
 //             preview the records (new / already imported / invalid), tick
-//             the ones you want and import them as Addition lifecycle
-//             events. Already-imported SAP documents can't be imported twice.
+//             the ones you want and "Download in our format" — a Master Data
+//             Set CSV (same columns as Bulk Import). Nothing is posted to the
+//             ledger from this page; upload the CSV in Bulk Import to post.
 // ======================================================
 
 import { useEffect, useState } from 'react';
@@ -11,7 +12,7 @@ import { integrationsApi } from '../../api/integrations.api';
 import { AppLayout } from '../../layout/AppLayout';
 import { Pill } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
-import { useAuth } from '../../context/AuthContext';
+import { buildUnifiedRowsCsv, downloadCsv } from '../../utils/csv';
 import { useFormOptions } from '../../hooks/useFormOptions';
 
 const STATUS = {
@@ -24,8 +25,6 @@ const money = (n) => Number(n).toLocaleString(undefined, { style: 'currency', cu
 
 export function SapIntegration() {
     useFormOptions();
-    const { user, hasEdit } = useAuth();
-    const canImport = hasEdit('sap');
 
     const [mode, setMode] = useState('');
     const [from, setFrom] = useState('');
@@ -33,9 +32,9 @@ export function SapIntegration() {
     const [records, setRecords] = useState(null); // null = not fetched yet
     const [selected, setSelected] = useState(new Set());
     const [loading, setLoading] = useState(false);
-    const [importing, setImporting] = useState(false);
+    const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState('');
-    const [outcome, setOutcome] = useState(null); // import result
+    const [outcome, setOutcome] = useState(null); // download result: { count, skipped }
 
     useEffect(() => {
         integrationsApi.sapStatus().then((r) => setMode(r.mode)).catch(() => { /* badge just stays hidden */ });
@@ -58,17 +57,22 @@ export function SapIntegration() {
         }
     }
 
-    async function importSelected() {
-        setImporting(true);
+    // Pull-only: server re-reads SAP, converts to our format, we build the CSV here.
+    async function downloadSelected() {
+        setDownloading(true);
         setError('');
+        setOutcome(null);
         try {
-            const res = await integrationsApi.sapImport({ documentIds: [...selected], user: user?.name });
-            setOutcome(res);
-            await fetchRecords(true); // refresh statuses (posted rows now show "Already imported")
+            const res = await integrationsApi.sapConvert({ documentIds: [...selected], from: from || undefined, to: to || undefined });
+            setOutcome({ count: res.rows.length, skipped: res.skipped });
+            if (res.rows.length > 0) {
+                // BOM so Excel shows the en dash in "Q1 (Jan–Mar)" correctly
+                downloadCsv(`sap-master-data-set-${new Date().toISOString().slice(0, 10)}.csv`, '\uFEFF' + buildUnifiedRowsCsv(res.rows));
+            }
         } catch (err) {
-            setError(err.message || 'Import failed.');
+            setError(err.message || 'Download failed.');
         } finally {
-            setImporting(false);
+            setDownloading(false);
         }
     }
 
@@ -88,13 +92,13 @@ export function SapIntegration() {
       <div className="page-header">
         <div>
           <h1>SAP Integration {mode && <Pill tone={mode === 'live' ? 'green' : 'amber'}>{mode === 'live' ? 'Live SAP' : 'Mock data'}</Pill>}</h1>
-          <p>Fetch asset acquisitions from SAP, review them, and import the ones you want as Addition events. Records already imported are never posted twice.</p>
+          <p>Fetch asset acquisitions from SAP (read-only), review them, and download the ones you want as a CSV in our Bulk Import format. Nothing is posted from this page.</p>
         </div>
       </div>
 
       {mode === 'mock' && (<div className="card card-pad" style={{ marginBottom: 16 }}>
           <p className="text-sm" style={{ margin: 0 }}>
-            <strong>Showing built-in sample data.</strong> Set <code>SAP_BASE_URL</code> in <code>server/.env</code> to connect a real SAP system. Posts are real and permanent either way.
+            <strong>Showing built-in sample data.</strong> Set <code>SAP_BASE_URL</code> in <code>server/.env</code> to connect a real SAP system. 
           </p>
         </div>)}
 
@@ -108,7 +112,7 @@ export function SapIntegration() {
             <label htmlFor="sap-to">Capitalized to</label>
             <input id="sap-to" type="date" value={to} onChange={(e) => setTo(e.target.value)}/>
           </div>
-          <Button onClick={() => fetchRecords()} disabled={loading || importing}>{loading ? 'Fetching…' : 'Fetch from SAP'}</Button>
+          <Button onClick={() => fetchRecords()} disabled={loading || downloading}>{loading ? 'Fetching…' : 'Fetch from SAP'}</Button>
         </div>
         {error && <p className="text-sm" style={{ color: 'var(--danger, #dc2626)', marginBottom: 0 }}>{error}</p>}
       </div>
@@ -118,16 +122,15 @@ export function SapIntegration() {
             <h3 style={{ fontSize: 14, margin: 0 }}>
               {records.length} record(s) from SAP — {importable.length} ready to import
             </h3>
-            <Button onClick={importSelected} disabled={!canImport || importing || loading || selected.size === 0}>
-              {importing ? 'Importing…' : `Import selected (${selected.size})`}
+            <Button onClick={downloadSelected} disabled={downloading || loading || selected.size === 0}>
+              {downloading ? 'Preparing…' : `Download in our format (${selected.size})`}
             </Button>
           </div>
-          {!canImport && <p className="text-sm text-muted">You can view SAP data, but your role can't import it.</p>}
 
           {outcome && (<p className="text-sm" style={{ margin: '0 0 8px' }}>
-              <Pill tone={outcome.summary.failed > 0 ? 'amber' : 'green'}>Import finished</Pill>{' '}
-              {outcome.summary.posted} posted, {outcome.summary.failed} failed, {outcome.summary.skipped} skipped.
-              {outcome.results.filter((r) => r.status !== 'posted').map((r) => (<span key={r.documentId} className="text-muted"> · {r.assetNumber || r.documentId}: {r.error}</span>))}
+              <Pill tone={outcome.skipped.length > 0 ? 'amber' : 'green'}>Download ready</Pill>{' '}
+              {outcome.count} row(s) converted, {outcome.skipped.length} skipped. Upload the file in Bulk Import → Master Data Set to post it.
+              {outcome.skipped.map((r) => (<span key={r.documentId} className="text-muted"> · {r.assetNumber || r.documentId}: {r.error}</span>))}
             </p>)}
 
           {records.length === 0 ? (<p className="text-muted text-sm">SAP returned no records for this period.</p>) : (<div style={{ overflowX: 'auto' }}>

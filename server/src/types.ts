@@ -31,6 +31,10 @@ export interface Asset {
     bonusPct: number;
     annualRate: number;
     propertyType: string;
+    /** Accounting period (ISO date) in which the Addition was BOOKED. When this is later
+     *  than the placed-in-service month, the earlier months are a closed/backdated
+     *  period: nothing is posted back into them — the whole catch-up lands in this month. */
+    bookedPeriod?: string;
   };
   /** Snapshot recorded at retirement — only present when status is
    *  'Retired'. Feeds the Lifecycle Events → Reinstatement card's
@@ -74,6 +78,12 @@ export interface DepreciationScheduleRow {
   depreciation: number;
   accumDepreciation: number;
   closingNbv: number;
+  /** Bonus (AFYD) recognised in this year. Added when the schedule is sent to the UI (not stored). */
+  bonus?: number;
+  /** Revision Absorbed (backdated catch-up = missed bonus + missed regular) posted in this year. Not stored. */
+  revisionAbsorbed?: number;
+  cyRevisionAbsorbed?: number;
+  pyRevisionAbsorbed?: number;
 }
 
 /**

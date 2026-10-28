@@ -1,0 +1,707 @@
+{
+  "info": {
+    "name": "AssetLedger Service API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "apiKey",
+      "value": "PASTE-KEY-HERE"
+    }
+  ],
+  "item": [
+    {
+      "name": "Connection test - who am I",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/service/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Additions",
+      "item": [
+        {
+          "name": "Addition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/additions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "additions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-ADD-1\",\n  \"fields\": {\n    \"company\": \"5B\",\n    \"assetClass\": \"00.12\",\n    \"cost\": 120000,\n    \"placedInService\": \"2026-03-15\",\n    \"accountingPeriodDate\": \"2026-03-31\",\n    \"quarter\": \"Q1 (Jan\\u2013Mar)\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/additions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "additions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-ADD-1\",\n      \"fields\": {\n        \"company\": \"5B\",\n        \"assetClass\": \"00.12\",\n        \"cost\": 120000,\n        \"placedInService\": \"2026-03-15\",\n        \"accountingPeriodDate\": \"2026-03-31\",\n        \"quarter\": \"Q1 (Jan\\u2013Mar)\"\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Adjustments",
+      "item": [
+        {
+          "name": "Adjustment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/adjustments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "adjustments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-ADJ-1\",\n  \"fields\": {\n    \"adjustmentAmount\": 5000,\n    \"effectiveDate\": \"2026-06-30\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/adjustments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "adjustments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-ADJ-1\",\n      \"fields\": {\n        \"adjustmentAmount\": 5000,\n        \"effectiveDate\": \"2026-06-30\"\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transfers",
+      "item": [
+        {
+          "name": "Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "transfers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-TRF-1\",\n  \"fields\": {\n    \"transferDate\": \"2026-07-01\",\n    \"costTransferred\": 20000,\n    \"destCompany\": \"2D\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/transfers",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "transfers"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-TRF-1\",\n      \"fields\": {\n        \"transferDate\": \"2026-07-01\",\n        \"costTransferred\": 20000,\n        \"destCompany\": \"2D\"\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Retirements",
+      "item": [
+        {
+          "name": "Retirement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/retirements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "retirements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-RET-1\",\n  \"fields\": {\n    \"disposalDate\": \"2026-09-30\",\n    \"proceeds\": 26250\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/retirements",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "retirements"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-RET-1\",\n      \"fields\": {\n        \"disposalDate\": \"2026-09-30\",\n        \"proceeds\": 26250\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reinstatements",
+      "item": [
+        {
+          "name": "Reinstatement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/reinstatements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "reinstatements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-REI-1\",\n  \"fields\": {\n    \"reinstatementDate\": \"2026-10-15\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/reinstatements",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "reinstatements"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-REI-1\",\n      \"fields\": {\n        \"reinstatementDate\": \"2026-10-15\"\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reclassifications",
+      "item": [
+        {
+          "name": "Reclassification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/reclassifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "reclassifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetNumber\": \"FA-1001\",\n  \"externalRef\": \"ERP-RCL-1\",\n  \"fields\": {\n    \"effectiveDate\": \"2026-10-01\",\n    \"newAssetType\": \"GDS-7\",\n    \"newLifeMonths\": 84\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One request for both modes. SINGLE: send the body below. BULK: replace the body with { \"rows\": [ {assetNumber, externalRef, fields}, ... ] } (see the saved example 'Bulk'). Same URL for both."
+          },
+          "response": [
+            {
+              "name": "Bulk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/service/lifecycle/reclassifications",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service",
+                    "lifecycle",
+                    "reclassifications"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rows\": [\n    {\n      \"assetNumber\": \"FA-1001\",\n      \"externalRef\": \"ERP-RCL-1\",\n      \"fields\": {\n        \"effectiveDate\": \"2026-10-01\",\n        \"newAssetType\": \"GDS-7\",\n        \"newLifeMonths\": 84\n      }\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reads",
+      "item": [
+        {
+          "name": "Assets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/assets?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "assets?limit=20"
+              ]
+            }
+          }
+        },
+        {
+          "name": "One asset",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/assets/FA-1001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "assets",
+                "FA-1001"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ledger transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/transactions?assetNumber=FA-1001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "transactions?assetNumber=FA-1001"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Status by externalRef",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/events/by-ref/ERP-ADD-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "events",
+                "by-ref",
+                "ERP-ADD-1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Generic (old, still works)",
+      "item": [
+        {
+          "name": "POST single event (eventType in body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/service/lifecycle/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "service",
+                "lifecycle",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"Adjustment\",\n  \"assetNumber\": \"FA-1001\",\n  \"fields\": {\n    \"adjustmentAmount\": 5000,\n    \"effectiveDate\": \"2026-06-30\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

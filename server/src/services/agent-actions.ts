@@ -9,7 +9,9 @@
 // ======================================================
 
 import { randomUUID } from 'node:crypto';
-import { calculateLifecyclePreview } from './depreciation.js';
+import { computeLifecycleEvent } from './lifecycleCompute.js';
+import { fillFromRegister } from './registerPrefill.js';
+import { getEngineAssetConfig } from './assetTypeConfig.js';
 import { findAsset } from '../data/assets.js';
 import { postLifecycleEvent, LifecycleValidationError } from '../routes/lifecycle.js';
 import type { LifecycleEventType, LifecyclePreviewResult } from '../types.js';
@@ -110,31 +112,6 @@ export interface ActionCard {
   inputs: { label: string; value: string }[];
 }
 
-// Fill gaps from the asset record we already hold, so the user is not asked for what the system knows.
-function prefill(eventType: LifecycleEventType, assetNumber: string, given: Fields): Fields {
-  const f: Fields = { ...given };
-  const a = findAsset(assetNumber);
-  if (!a) return f;
-  const tfp = a.taxFactPattern;
-  if (f.accountingPeriodDate === undefined) {
-    const d = f.disposalDate ?? f.effectiveDate ?? f.transferDate ?? f.reinstatementDate;
-    if (d !== undefined) f.accountingPeriodDate = d; // same period as the event unless the user says otherwise
-  }
-  if (eventType === 'Retirement') {
-    const yrs = parseFloat(String(tfp?.recoveryPeriod ?? ''));
-    if (f.recoveryPeriodYears === undefined && Number.isFinite(yrs)) f.recoveryPeriodYears = yrs;
-    if (f.cost === undefined) f.cost = a.cost;
-    if (f.costDisposed === undefined && given.costDisposed === undefined) f.costDisposed = a.cost;
-    if (f.placedInService === undefined && tfp?.placedInService) f.placedInService = tfp.placedInService;
-    if (f.bonusPct === undefined && tfp) f.bonusPct = tfp.bonusPct;
-  } else if (eventType === 'Adjustment' || eventType === 'Reinstatement' || eventType === 'Reclassification') {
-    if (f.originalCost === undefined) f.originalCost = a.cost;
-    if (f.placedInService === undefined && tfp?.placedInService) f.placedInService = tfp.placedInService;
-    if (f.bonusPct === undefined && tfp && eventType !== 'Reclassification') f.bonusPct = tfp.bonusPct;
-  }
-  return f;
-}
-
 // ---------- Propose / confirm / cancel ----------
 
 export function proposeEvent(args: { eventType: unknown; assetNumber: unknown; fields: unknown }):
@@ -150,7 +127,8 @@ export function proposeEvent(args: { eventType: unknown; assetNumber: unknown; f
   if (eventType === 'Addition' && exists) return { ok: false, error: `Asset ${assetNumber} already exists; an asset number can only have one Addition.` };
 
   const raw = args.fields && typeof args.fields === 'object' ? (args.fields as Fields) : {};
-  const fields = prefill(eventType, assetNumber, raw);
+  // Same register pre-fill as Bulk Import / Service API (services/registerPrefill.ts).
+  const fields = fillFromRegister(eventType, findAsset(assetNumber), raw, getEngineAssetConfig()) as Fields;
 
   const missing = REQUIRED[eventType].filter((k) => fields[k] === undefined || fields[k] === '' || fields[k] === null);
   if (missing.length) {
@@ -159,7 +137,7 @@ export function proposeEvent(args: { eventType: unknown; assetNumber: unknown; f
 
   let preview: LifecyclePreviewResult;
   try {
-    preview = calculateLifecyclePreview({ eventType, assetNumber, fields });
+    preview = computeLifecycleEvent(eventType, assetNumber, fields).preview;
   } catch (err) {
     return { ok: false, error: `Calculation failed: ${err instanceof Error ? err.message : 'unknown error'}` };
   }

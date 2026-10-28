@@ -15,8 +15,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hydrate, queueFlush, registerSnapshotSource, flushNow } from '../db/repo.js';
-import { buildSchedule, ensureSchedules, inServiceDate, recoveryYears } from '../services/schedule-builder.js';
+import { buildSchedule, ensureSchedules, inServiceDate, recoveryYears, toISODate } from '../services/schedule-builder.js';
 import { syncBookEntries } from '../services/book-view.js';
+import { pool } from '../db/postgres.js';
 import type {
   Asset,
   BookEntries,
@@ -218,6 +219,48 @@ export function ensureTaxFactPatterns(
 // ======================================================
 
 // ======================================================
+// Function : rebookFromLedger
+// Purpose  : For every asset with a fact pattern but no bookedPeriod, finds its posted
+//            Addition in asset_transactions, takes accountingPeriodDate from the form
+//            fields the user submitted, and rebuilds the stored schedule + book entries.
+//            Never throws (a ledger hiccup must not stop boot). Returns how many it fixed.
+// ======================================================
+
+async function rebookFromLedger(): Promise<number> {
+  const todo = assets.filter((a) => a.taxFactPattern && !a.taxFactPattern.bookedPeriod);
+  if (todo.length === 0) return 0;
+  let fixed = 0;
+  try {
+    const res = await pool.query(
+      `SELECT DISTINCT ON (asset_number) asset_number, fields_json
+         FROM asset_transactions
+        WHERE lower(event_type) = 'addition'
+        ORDER BY asset_number, posted_at DESC`
+    );
+    const byAsset = new Map<string, string>();
+    for (const r of res.rows) {
+      try {
+        const f = JSON.parse(String(r.fields_json)) as Record<string, unknown>;
+        const iso = toISODate(f.accountingPeriodDate);
+        if (iso) byAsset.set(String(r.asset_number).trim(), iso);
+      } catch { /* unreadable row: skip */ }
+    }
+    for (const a of todo) {
+      const iso = byAsset.get(a.assetNumber);
+      if (!iso || !a.taxFactPattern) continue;
+      a.taxFactPattern.bookedPeriod = iso;
+      const rows = buildSchedule(a);
+      if (rows.length > 0) depreciationSchedules[a.assetNumber] = rows;
+      syncBookEntries([a]);
+      fixed += 1;
+    }
+  } catch (err) {
+    console.error('[assets] rebookFromLedger skipped:', err instanceof Error ? err.message : err);
+  }
+  return fixed;
+}
+
+// ======================================================
 // Function : initStore
 // Purpose  : Boot-time hydration. Postgres first; if it has no assets
 //            yet, bootstrap it from data-store.json  and write that straight back so Postgres
@@ -228,7 +271,9 @@ export function ensureTaxFactPatterns(
 // ======================================================
 
 export async function initStore(): Promise<{ source: string; assetCount: number; schedulesBuilt: number }> {
+  console.log('[boot] loading assets from Postgres...');
   const fromCh = await hydrate();
+  console.log(`[boot] hydrate done - ${fromCh.assets.length} assets`);
 
   let source: string;
   if (fromCh.assets.length > 0) {
@@ -255,8 +300,23 @@ export async function initStore(): Promise<{ source: string; assetCount: number;
   const needBooks = assets.filter((a) => !bookEntries[a.assetNumber]);
   if (needBooks.length > 0) syncBookEntries(needBooks);
 
+  // Assets posted before the "booked period" fix: read the Accounting Period Date from their
+  // Addition in the ledger, then rebuild so the closed prior years are empty and the whole
+  // catch-up sits in the booked month. Runs once per asset (afterwards bookedPeriod is stored).
+  console.log('[boot] checking booked periods...');
+  const rebooked = await rebookFromLedger();
+  console.log(`[boot] booked periods checked - ${rebooked} rebuilt`);
+
   if (source !== 'postgres' || needBooks.length > 0 || built.length > 0 || tfpBuilt.length > 0) {
+    console.log('[boot] saving to Postgres...');
     await flushNow();
+    console.log('[boot] saved');
+  } else if (rebooked > 0) {
+    // The rebuilt schedules are already in memory (what the API serves). Saving them writes every
+    // asset + every book's schedule row by row, which is slow over Neon, so do it in the
+    // background instead of making the server wait before it starts listening.
+    console.log('[boot] saving rebuilt schedules to Postgres in the background...');
+    persist();
   }
 
   return { source, assetCount: assets.length, schedulesBuilt: built.length };
@@ -371,6 +431,8 @@ function buildTaxFactPattern(
   // newly-added asset's contribution to those two views.
   const rateRow = rowValue(rows, 'Current-Year Rate');
   const annualRate = rateRow ? parseMoney(rateRow) : undefined;
+  // Accounting period the Addition is booked in. Blank -> same as placed-in-service (current period).
+  const bookedPeriod = toISODate(fields.accountingPeriodDate) ?? prior?.bookedPeriod;
 
   return {
     placedInService: typeof fields.placedInService === 'string' && fields.placedInService ? fields.placedInService : prior?.placedInService ?? '',
@@ -379,7 +441,8 @@ function buildTaxFactPattern(
     convention: convention || prior?.convention || 'Half-Year',
     bonusPct: Number.isFinite(bonusPct) ? bonusPct : prior?.bonusPct ?? 0,
     annualRate: annualRate ?? prior?.annualRate ?? 0,
-    propertyType: prior?.propertyType ?? 'Personal Property'
+    propertyType: prior?.propertyType ?? 'Personal Property',
+    ...(bookedPeriod ? { bookedPeriod } : {})
   };
 }
 

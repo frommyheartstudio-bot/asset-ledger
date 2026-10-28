@@ -95,9 +95,13 @@ async function start(): Promise<void> {
   console.log(`[boot] bonus depreciation rules loaded from Postgres - ${bonusRuleCount} rules`);
 
   await initFormOptions();
+  console.log('[boot] initFormOptions done');
   await assertSeedData();
+  console.log('[boot] assertSeedData done');
   await initAssetClassLabels();
+  console.log('[boot] initAssetClassLabels done');
   await initRecoveryDefaults();
+  console.log('[boot] initRecoveryDefaults done');
 
   const { source, assetCount, schedulesBuilt } = await initStore();
   console.log(`[boot] asset book hydrated from ${source} — ${assetCount} assets, ${schedulesBuilt} schedules generated`);

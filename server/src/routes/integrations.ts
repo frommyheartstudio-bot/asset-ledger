@@ -6,7 +6,11 @@
 //             /api/integrations.
 //               GET  /sap/status   -> { mode: 'mock' | 'live' }
 //               POST /sap/fetch    -> records + status (new/imported/invalid)
+//               POST /sap/convert  -> PULL-ONLY: converts the chosen records to
+//                                     our Master Data Set rows (nothing is posted)
 //               POST /sap/import   -> posts the chosen records as Additions
+//                                     (no longer used by the SAP page, which is
+//                                     download-only; kept for API users)
 //             Already-imported records are skipped via integration_imports,
 //             and posting reuses runBulkImport — the same code as Bulk Import.
 // ======================================================
@@ -49,6 +53,45 @@ integrationsRouter.post('/sap/fetch', async (req, res) => {
   } catch (err) {
     console.error('SAP fetch failed:', err);
     res.status(502).json({ error: `Could not fetch from SAP: ${err instanceof Error ? err.message : 'unknown error'}` });
+  }
+});
+
+integrationsRouter.post('/sap/convert', async (req, res) => {
+  const { documentIds, from, to } = (req.body ?? {}) as { documentIds?: string[]; from?: string; to?: string };
+  if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    res.status(400).json({ error: 'documentIds must be a non-empty array' });
+    return;
+  }
+  if (documentIds.length > MAX_IMPORT) {
+    res.status(413).json({ error: `Too many records (${documentIds.length}). Maximum per download is ${MAX_IMPORT}.` });
+    return;
+  }
+  if ((from && !isDate(from)) || (to && !isDate(to))) {
+    res.status(400).json({ error: 'from / to must be YYYY-MM-DD' });
+    return;
+  }
+
+  try {
+    // Pull-only: read from SAP again and convert on the server (never trust
+    // amounts sent back from the browser). Nothing is written to the ledger
+    // or to integration_imports.
+    const wanted = new Set(documentIds);
+    const records = (await fetchSapRecords({ from: from || undefined, to: to || undefined })).filter((r) => wanted.has(r.documentId));
+    const map = await buildMapper();
+
+    const rows: Array<{ assetNumber: string; eventType: 'Addition'; fields: Record<string, unknown> }> = [];
+    const skipped: Array<{ documentId: string; assetNumber: string; error: string }> = [];
+    for (const id of documentIds) {
+      const rec = records.find((r) => r.documentId === id);
+      if (!rec) { skipped.push({ documentId: id, assetNumber: '', error: 'Record not found in SAP' }); continue; }
+      const m = map(rec);
+      if (!m.ok) { skipped.push({ documentId: id, assetNumber: rec.assetNumber, error: m.error }); continue; }
+      rows.push({ assetNumber: m.assetNumber, eventType: 'Addition', fields: m.fields });
+    }
+    res.json({ rows, skipped });
+  } catch (err) {
+    console.error('SAP convert failed:', err);
+    res.status(502).json({ error: `SAP convert failed: ${err instanceof Error ? err.message : 'unknown error'}` });
   }
 });
 

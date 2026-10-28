@@ -246,15 +246,53 @@ function errorResult(engineResult: any): LifecyclePreviewResult {
 //            (so a client that sends no Bonus % still gets the right rate).
 // ======================================================
 
-function bonusPctOrLookup(f: Record<string, unknown>, pisd: string): number {
-  const raw = f['bonusPct'];
+function bonusPctOrLookup(f: Record<string, unknown>, pisd: string, key = 'bonusPct'): number {
+  const raw = f[key];
   if (raw === undefined || raw === null || String(raw).trim() === '') {
     // Customize Table (Book / Company / Asset Type / Year) first, then the Default Table date rule.
     const custom = customBonusPct({ book: str(f, 'book'), company: str(f, 'company'), assetType: str(f, 'assetClass'), date: pisd });
     return custom ?? bonusPctForDate(pisd) ?? 0;
   }
-  return num(f, 'bonusPct');
+  return num(f, key);
 }
+
+// ======================================================
+// END: bonusPctOrLookup
+// ======================================================
+
+// ======================================================
+// Function : lifeYearsFromCode
+// Purpose  : Recovery life in years taken from the asset code ('GDS-5' -> 5,
+//            'GDS-27.5' -> 27.5, 'GDS-5-WBC' -> 5); null when the code has none ('NONE').
+//            Used so a blank life is auto-filled like the UI does, not silently 60 months.
+// ======================================================
+
+function lifeYearsFromCode(code: string): number | null {
+  const m = /^[A-Za-z]+\d*-(\d+(?:\.\d+)?)/.exec(code || '');
+  const y = m ? Number(m[1]) : NaN;
+  return Number.isFinite(y) && y > 0 ? y : null;
+}
+
+// ======================================================
+// END: lifeYearsFromCode
+// ======================================================
+
+// ======================================================
+// Function : lifeMonthsOrDerive
+// Purpose  : lifeMonths as posted; when blank, derived from the asset code's life
+//            (UI behaviour), and only then the legacy 60-month default.
+// ======================================================
+
+function lifeMonthsOrDerive(f: Record<string, unknown>, key: string, code: string): number {
+  const posted = num(f, key, 0);
+  if (posted > 0) return posted;
+  const years = lifeYearsFromCode(code);
+  return years ? Math.round(years * 12) : 60;
+}
+
+// ======================================================
+// END: lifeMonthsOrDerive
+// ======================================================
 
 // ── Addition ─────────────────────────────────────────────────────────────
 // ======================================================
@@ -271,7 +309,7 @@ function calcAddition(f: Record<string, unknown>): LifecyclePreviewResult {
     cost: num(f, 'cost'),
     pisd,
     accountingPeriodDate,
-    lifeMonths: num(f, 'lifeMonths', 60) || 60,
+    lifeMonths: lifeMonthsOrDerive(f, 'lifeMonths', assetCode(f)),
     bonusPercent: electOut ? 0 : bonusPctOrLookup(f, pisd),
     convention: normConvention(str(f, 'convention', 'HY (Half-Year)')),
     quarter: parseQuarter(f['quarter']),
@@ -416,8 +454,9 @@ function calcAdjustment(f: Record<string, unknown>): LifecyclePreviewResult {
     pisd: str(f, 'placedInService'),
     effectiveDate: str(f, 'effectiveDate'),
     accountingPeriodDate: str(f, 'accountingPeriodDate'),
-    lifeMonths: num(f, 'lifeMonths', 60) || 60,
-    bonusPercent: electOut ? 0 : num(f, 'bonusPct'),
+    lifeMonths: lifeMonthsOrDerive(f, 'lifeMonths', code),
+    bonusPercent: electOut ? 0 : bonusPctOrLookup(f, str(f, 'placedInService')),
+    samePeriodsAsAddition: bool(f, 'samePeriodsAsAddition'),
     convention: normConvention(str(f, 'convention', 'HY (Half-Year)')),
     method: methodForCode(code),
     assetType: code,
@@ -537,14 +576,14 @@ function calcRetirement(f: Record<string, unknown>): LifecyclePreviewResult {
     accountingPeriodDate: str(f, 'accountingPeriodDate'),
     convention: normConvention(str(f, 'convention', 'HY (Half-Year)'), 'short'),
     depreciationMethod: methodForCode(code),
-    recoveryPeriod: num(f, 'recoveryPeriodYears', 5) || 5,
+    recoveryPeriod: num(f, 'recoveryPeriodYears', 0) || lifeYearsFromCode(code) || 5,
     assetType: code,
-    bonusPercentage: num(f, 'bonusPct'),
+    bonusPercentage: bonusPctOrLookup(f, str(f, 'placedInService')),
     boyAccumulatedDepr: num(f, 'boyAccumDepr'),
     monthlyDeprRate: num(f, 'monthlyDeprRate'),
     costDisposed: num(f, 'costDisposed'),
     proceeds: num(f, 'proceeds'),
-    basisOverrides: []
+    basisOverrides: Array.isArray(f['basisOverrides']) ? (f['basisOverrides'] as unknown[]) : []
   });
   if (result.error) return errorResult(result);
 
@@ -684,7 +723,7 @@ function calcTransfer(f: Record<string, unknown>): LifecyclePreviewResult {
     destCompany: str(f, 'destCompany'),
     sourceLocation: str(f, 'sourceLocation'),
     destLocation: str(f, 'destLocation'),
-    lifeMonths: num(f, 'lifeMonths', 60) || 60,
+    lifeMonths: lifeMonthsOrDerive(f, 'lifeMonths', assetCode(f)),
     convention: normConvention(str(f, 'convention', 'HY')),
     method: 'MACRS',
     monthlyDeprRate: num(f, 'monthlyDeprRate'),
@@ -814,9 +853,9 @@ function calcReinstatement(f: Record<string, unknown>): LifecyclePreviewResult {
     originalGainLoss: num(f, 'originalGainLoss'),
     pisd: str(f, 'placedInService'),
     method: methodForCode(code),
-    lifeMonths: num(f, 'lifeMonths', 60) || 60,
+    lifeMonths: lifeMonthsOrDerive(f, 'lifeMonths', code),
     convention: normConvention(str(f, 'convention', 'HY (Half-Year)')),
-    bonusPercent: num(f, 'bonusPct')
+    bonusPercent: bonusPctOrLookup(f, str(f, 'placedInService'))
   });
   if (result.error) return errorResult(result);
 
@@ -927,13 +966,13 @@ function calcReclassification(f: Record<string, unknown>): LifecyclePreviewResul
     existingAD: num(f, 'existingAD'),
     pisd: str(f, 'placedInService'),
     oldMethod: str(f, 'oldMethod', 'MACRS'),
-    oldLifeMonths: num(f, 'oldLifeMonths', 60) || 60,
+    oldLifeMonths: lifeMonthsOrDerive(f, 'oldLifeMonths', codeForLabel(str(f, 'oldAssetType'))),
     oldConvention: normConvention(str(f, 'oldConvention', 'HY')),
-    oldBonusPercent: num(f, 'oldBonusPct'),
+    oldBonusPercent: bonusPctOrLookup(f, str(f, 'placedInService'), 'oldBonusPct'),
     newMethod: str(f, 'newMethod', 'MACRS'),
-    newLifeMonths: num(f, 'newLifeMonths', 60) || 60,
+    newLifeMonths: lifeMonthsOrDerive(f, 'newLifeMonths', codeForLabel(str(f, 'newAssetType'))),
     newConvention: normConvention(str(f, 'newConvention', 'HY')),
-    newBonusPercent: num(f, 'newBonusPct')
+    newBonusPercent: bonusPctOrLookup(f, str(f, 'placedInService'), 'newBonusPct')
   });
   if (result.error) return errorResult(result);
 

@@ -4,11 +4,9 @@
 // ======================================================
 
 import { Router } from 'express';
-import { calculateLifecyclePreview } from '../services/depreciation.js';
+import { computeLifecycleEvent } from '../services/lifecycleCompute.js';
 import { pool } from '../db/postgres.js';
 import { applyLifecycleEvent, findAsset } from '../data/assets.js';
-import { fillFromRegister } from '../services/registerPrefill.js';
-import { getEngineAssetConfig } from '../services/assetTypeConfig.js';
 import type { LifecyclePreviewInput, LifecyclePreviewResult } from '../types.js';
 
 
@@ -211,13 +209,8 @@ lifecycleRouter.post('/preview', (req, res) => {
     return;
   }
 
-  const input: LifecyclePreviewInput = {
-    eventType: body.eventType,
-    assetNumber: body.assetNumber ?? '',
-    fields: body.fields
-  };
-
-  res.json(calculateLifecyclePreview(input));
+  // Same single calculation path as Bulk Import / Service API / AI agent.
+  res.json(computeLifecycleEvent(body.eventType, body.assetNumber ?? '', body.fields).preview);
 });
 
 // POST /api/lifecycle/post — "Confirm & Post" click. Writes ONE immutable
@@ -276,13 +269,8 @@ export async function runBulkImport(
       continue;
     }
     try {
-      const input: LifecyclePreviewInput = {
-        eventType,
-        assetNumber,
-        // blank fields are filled from the Asset Register (never overwrites what the caller sent)
-        fields: fillFromRegister(eventType, findAsset(assetNumber.trim()), (row.fields ?? {}) as Record<string, unknown>, getEngineAssetConfig()) as LifecyclePreviewInput['fields']
-      };
-      const preview = calculateLifecyclePreview(input);
+      // Register pre-fill + calculation: the one shared path (services/lifecycleCompute.ts).
+      const { input, preview } = computeLifecycleEvent(eventType, assetNumber, row.fields);
 
       await assertAdditionAllowed(eventType, assetNumber, preview);
 
@@ -371,13 +359,8 @@ export async function runBulkPost(rows: BulkPostRow[], postedBy: string): Promis
     }
 
     try {
-      const input: LifecyclePreviewInput = {
-        eventType,
-        assetNumber,
-        // blank fields are filled from the Asset Register (never overwrites what the caller sent)
-        fields: fillFromRegister(eventType, findAsset(assetNumber.trim()), (row.fields ?? {}) as Record<string, unknown>, getEngineAssetConfig()) as LifecyclePreviewInput['fields']
-      };
-      const preview = calculateLifecyclePreview(input);
+      // Register pre-fill + calculation: the one shared path (services/lifecycleCompute.ts).
+      const { input, preview } = computeLifecycleEvent(eventType, assetNumber, row.fields);
 
       await assertAdditionAllowed(eventType, assetNumber, preview);
 

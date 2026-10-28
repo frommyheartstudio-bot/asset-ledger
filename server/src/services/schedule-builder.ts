@@ -196,6 +196,136 @@ function rateForYear(asset: Asset, life: number, year: number, monthPIS: number)
 // ======================================================
 
 // ======================================================
+// Function : bookedContext
+// Purpose  : Is this asset a backdated / booked-later Addition? Returns the
+//            year + month it was booked in (from taxFactPattern.bookedPeriod)
+//            together with its placed-in-service year + month. null when the
+//            booked period is unknown or is before the in-service month.
+//            bookedMonth === pisdMonth (same year) is a normal current-period
+//            Addition: any bonus (AFYD) then lands in that one month.
+// ======================================================
+
+export function bookedContext(asset: Asset): { bookedYear: number; bookedMonth: number; pisdYear: number; pisdMonth: number } | null {
+  const booked = toISODate(asset.taxFactPattern?.bookedPeriod);
+  const pis = toISODate(asset.taxFactPattern?.placedInService);
+  if (!booked || !pis) return null;
+  const bookedYear = Number(booked.slice(0, 4));
+  const bookedMonth = Number(booked.slice(5, 7));
+  const pisdYear = Number(pis.slice(0, 4));
+  const pisdMonth = Number(pis.slice(5, 7));
+  if (bookedYear * 12 + bookedMonth < pisdYear * 12 + pisdMonth) return null;
+  return { bookedYear, bookedMonth, pisdYear, pisdMonth };
+}
+
+// ======================================================
+// Function : bookedYearSplit
+// Purpose  : Splits the booked year's schedule row into the ONE-TIME catch-up
+//            (bonus AFYD + all regular depreciation from the in-service month
+//            up to the month before booking = the calculator's "Revision
+//            Absorbed") that is posted in the booked month, and the ordinary
+//            monthly amount for the booked month and every month after it.
+//            Same maths as the Additions calculator (getCumulativeDepr).
+// ======================================================
+
+export function bookedYearSplit(
+  asset: Asset,
+  rowDepreciation: number
+): { bookedYear: number; bookedMonth: number; catchUp: number; monthly: number; afyd: number; missedRegular: number; pyRegular: number; cyRegular: number } | null {
+  const ctx = bookedContext(asset);
+  if (!ctx) return null;
+  const cost = Number(asset.cost) || 0;
+  const bonusPct = Math.min(100, Math.max(0, Number(asset.taxFactPattern?.bonusPct) || 0));
+  const afyd = (cost * bonusPct) / 100;
+
+  let missedRegular = 0;
+  if (ctx.bookedYear * 12 + ctx.bookedMonth > ctx.pisdYear * 12 + ctx.pisdMonth) {
+    const priorMonth = ctx.bookedMonth - 1 || 12;
+    const priorYear = ctx.bookedMonth - 1 ? ctx.bookedYear : ctx.bookedYear - 1;
+    try {
+      missedRegular = Number(RATE_TABLES.getCumulativeDepr({
+        cost,
+        bonusPercent: bonusPct,
+        lifeYears: Math.round(recoveryYears(asset)),
+        method: engineMethod(asset),
+        convention: engineConvention(asset),
+        pisdMonth: ctx.pisdMonth,
+        pisdYear: ctx.pisdYear,
+        targetYear: priorYear,
+        targetMonth: priorMonth
+      })) || 0;
+    } catch {
+      missedRegular = 0;
+    }
+  }
+
+  // Prior-year portion (py_revision_absorbed): regular depreciation from PISD through Dec 31 of the
+  // year BEFORE the booked year. The rest of the missed regular (Jan .. month before booking, in the
+  // booked year) is the current-year portion (fed_revision_absorbed). pyRegular + cyRegular = missedRegular.
+  let pyRegular = 0;
+  if (missedRegular > 0 && ctx.bookedYear > ctx.pisdYear) {
+    try {
+      pyRegular = Number(RATE_TABLES.getCumulativeDepr({
+        cost,
+        bonusPercent: bonusPct,
+        lifeYears: Math.round(recoveryYears(asset)),
+        method: engineMethod(asset),
+        convention: engineConvention(asset),
+        pisdMonth: ctx.pisdMonth,
+        pisdYear: ctx.pisdYear,
+        targetYear: ctx.bookedYear - 1,
+        targetMonth: 12
+      })) || 0;
+    } catch {
+      pyRegular = 0;
+    }
+    pyRegular = Math.min(pyRegular, missedRegular);
+  }
+  const cyRegular = missedRegular - pyRegular;
+
+  const catchUp = Math.min(round2(afyd + missedRegular), rowDepreciation);
+  const monthsLeft = 13 - ctx.bookedMonth; // booked month .. December
+  const monthly = Math.max(0, round2((rowDepreciation - catchUp) / monthsLeft));
+  return { bookedYear: ctx.bookedYear, bookedMonth: ctx.bookedMonth, catchUp, monthly, afyd: round2(afyd), missedRegular: round2(missedRegular), pyRegular: round2(pyRegular), cyRegular: round2(cyRegular) };
+}
+
+// ======================================================
+// Function : withBonusAndRevision
+// Purpose  : Adds the two columns the Depreciation Schedule shows, using the same numbers
+//            as the Additions calculator:
+//              bonus            = Step 4  AFYD = Cost x Bonus%   (in the year it is recognised)
+//              revisionAbsorbed = Step 6  missed regular (PISD .. month before booking)
+//                                         + missed bonus; only for a backdated Addition,
+//                                         in the booked year (that is where it is posted).
+//            "Depreciation" stays the year's total expense, so Accum / NBV still tie out.
+// ======================================================
+
+export function withBonusAndRevision(asset: Asset, rows: DepreciationScheduleRow[]): DepreciationScheduleRow[] {
+  const cost = Number(asset.cost) || 0;
+  const bonusPct = Math.min(100, Math.max(0, Number(asset.taxFactPattern?.bonusPct) || 0));
+  const afyd = round2((cost * bonusPct) / 100);
+  const ctx = bookedContext(asset);
+  const firstYear = rows[0] ? Number(rows[0].year.slice(0, 4)) : 0;
+
+  return rows.map((r) => {
+    const year = Number(r.year.slice(0, 4));
+    const split = ctx && ctx.bookedYear === year ? bookedYearSplit(asset, r.depreciation) : null;
+    if (split) {
+      const backdated = split.bookedYear * 12 + split.bookedMonth > ctx!.pisdYear * 12 + ctx!.pisdMonth;
+      return {
+        ...r,
+        bonus: split.afyd,
+        // Current-year revision = missed bonus + missed regular inside the booked year; prior-year = regular through prior Dec 31.
+        cyRevisionAbsorbed: backdated ? round2(split.afyd + split.cyRegular) : 0,
+        pyRevisionAbsorbed: backdated ? split.pyRegular : 0,
+        revisionAbsorbed: backdated ? round2(split.afyd + split.missedRegular) : 0
+      };
+    }
+    // No booked period known (older asset): bonus sits in the first (in-service) year, no revision.
+    return { ...r, bonus: !ctx && year === firstYear ? afyd : 0, cyRevisionAbsorbed: 0, pyRevisionAbsorbed: 0, revisionAbsorbed: 0 };
+  });
+}
+
+// ======================================================
 // Function : buildSchedule
 // Purpose  : Produces the year-by-year rows the Dashboard chart and the
 //            Forecasting roll-forward read. Starts from the asset's
@@ -218,6 +348,11 @@ export function buildSchedule(asset: Asset): DepreciationScheduleRow[] {
   const startYear = Number(pis.slice(0, 4));
   const monthPIS = Number(pis.slice(5, 7)) || 1;
 
+  // Bonus (AFYD) is expensed in Year 1; regular MACRS runs on what is left (cost - AFYD).
+  const bonusPct = Math.min(100, Math.max(0, Number(asset.taxFactPattern?.bonusPct) || 0));
+  const afyd = round2((cost * bonusPct) / 100);
+  const basis = cost - afyd;
+
   const rows: DepreciationScheduleRow[] = [];
   let accum = 0;
   let openingNbv = cost;
@@ -235,7 +370,7 @@ export function buildSchedule(asset: Asset): DepreciationScheduleRow[] {
     const slRate = i === 0 || i === Math.ceil(life) ? (100 / life) / 2 : 100 / life;
     const ratePct = rateForYear(asset, life, i + 1, monthPIS) ?? slRate;
 
-    let depreciation = round2((cost * ratePct) / 100);
+    let depreciation = round2((basis * ratePct) / 100) + (i === 0 ? afyd : 0);
     if (accum + depreciation > cost) depreciation = round2(cost - accum);
     if (depreciation < 0) depreciation = 0;
 
@@ -245,13 +380,32 @@ export function buildSchedule(asset: Asset): DepreciationScheduleRow[] {
     rows.push({
       year: `${startYear + i} (Yr ${i + 1})`,
       openingNbv: round2(openingNbv),
-      rate: round2(ratePct),
+      // With bonus the row's rate is the effective % of cost (100% bonus -> 100.00%).
+      rate: bonusPct > 0 ? round2((depreciation / cost) * 100) : round2(ratePct),
       depreciation,
       accumDepreciation: accum,
       closingNbv
     });
 
     openingNbv = closingNbv;
+  }
+
+  // Backdated Addition into a LATER year: the earlier years are closed, so nothing is
+  // posted back into them. Fold every earlier year into the year the Addition was booked.
+  const booked = bookedContext(asset);
+  if (booked && booked.bookedYear > startYear) {
+    const upTo = rows.filter((r) => Number(r.year.slice(0, 4)) <= booked.bookedYear);
+    const rest = rows.filter((r) => Number(r.year.slice(0, 4)) > booked.bookedYear);
+    const folded = round2(upTo.reduce((t, r) => t + r.depreciation, 0));
+    const bookedRow: DepreciationScheduleRow = {
+      year: `${booked.bookedYear} (Yr ${booked.bookedYear - startYear + 1})`,
+      openingNbv: round2(cost),
+      rate: round2((folded / cost) * 100),
+      depreciation: folded,
+      accumDepreciation: folded,
+      closingNbv: round2(cost - folded)
+    };
+    return [bookedRow, ...rest];
   }
 
   return rows;

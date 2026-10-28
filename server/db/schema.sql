@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS assets
     "tfp_bonusPct"        NUMERIC(5,2),
     "tfp_annualRate"      NUMERIC(5,2),
     "tfp_propertyType"    TEXT,
+    "tfp_bookedPeriod"    DATE,   -- accounting period the Addition was booked in (backdated catch-up month)
     -- disposal (flattened, only set when status = 'Retired')
     "disp_disposalDate"   DATE,
     "disp_adAtDisposal"   NUMERIC(18,2),
@@ -52,6 +53,7 @@ ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_convention" TEXT;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_bonusPct" NUMERIC(5,2);
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_annualRate" NUMERIC(5,2);
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_propertyType" TEXT;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_bookedPeriod" DATE;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "disp_disposalDate" DATE;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "disp_adAtDisposal" NUMERIC(18,2);
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS "disp_gainLoss" NUMERIC(18,2);

@@ -277,15 +277,19 @@ export function AssetDetail() {
           {depreciationSchedule.length === 0 ? (<div className="card-pad">
               <p className="text-muted text-sm">No projected schedule available for this asset yet.</p>
             </div>) : (<div className="table-wrap">
-              <table className="table">
+              <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                <colgroup><col style={{ width: '12%' }}/>{Array.from({ length: 8 }).map((_, i) => (<col key={i} style={{ width: '11%' }}/>))}</colgroup>
                 <thead>
                   <tr>
                     <th>Year</th>
-                    <th className="num">Opening NBV</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Opening NBV</th>
                     <th className="num">Rate</th>
-                    <th className="num">Depreciation</th>
-                    <th className="num">Accum. Depr</th>
-                    <th className="num">Closing NBV</th>
+                    <th className="num" title="Bonus depreciation (AFYD) = Cost x Bonus %">Bonus</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }} title="Current-year catch-up = missed bonus (AFYD) + missed regular depreciation inside the booked year (Jan .. month before booking)">Revision Absorbed<br/>(Current Yr)</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }} title="Prior-year catch-up = missed regular depreciation from placed-in-service through Dec 31 of the year before the booked year">Revision Absorbed<br/>(Prior Yr)</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Depreciation</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Accum. Depr</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Closing NBV</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -297,17 +301,21 @@ export function AssetDetail() {
                         <td><span style={{ display: 'inline-block', width: 14 }}>{isOpen ? '▾' : '▸'}</span>{row.year}</td>
                         <td className="num" data-label="Opening NBV">{formatCurrency(row.openingNbv, { compact: true })}</td>
                         <td className="num" data-label="Rate">{row.rate.toFixed(2)}%</td>
+                        <td className="num" data-label="Bonus">{formatCurrency(row.bonus ?? 0, { compact: true })}</td>
+                        <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(row.cyRevisionAbsorbed ?? row.revisionAbsorbed ?? 0, { compact: true })}</td>
+                        <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(row.pyRevisionAbsorbed ?? 0, { compact: true })}</td>
                         <td className="num" data-label="Depreciation">{formatCurrency(row.depreciation, { compact: true })}</td>
                         <td className="num" data-label="Accum. Depr">{formatCurrency(row.accumDepreciation, { compact: true })}</td>
                         <td className="num" data-label="Closing NBV">{formatCurrency(row.closingNbv, { compact: true })}</td>
                       </tr>
                       {isOpen && (<tr>
-                          <td colSpan={6} style={{ background: 'var(--surface-2, #f8fafc)', padding: 0 }}>
-                            <div className="card-pad" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                          <td colSpan={9} style={{ background: 'var(--surface-2, #f8fafc)', padding: 0 }}>
+                            <div style={{ padding: 0 }}>
                               {monthlyLoading && !monthlyByYear[year] ? (<Loader label="Loading months…"/>) : monthlyError ? (
                                 <ErrorMessage message={monthlyError} onRetry={() => toggleYear(row)}/>
                               ) : (<div className="table-wrap" style={{ maxHeight: 'none', overflowY: 'visible' }}>
-                                  <table className="table" style={{ fontSize: 12 }}>
+                                  <table className="table" style={{ fontSize: 12, tableLayout: 'fixed', width: '100%' }}>
+                                    <colgroup><col style={{ width: '12%' }}/>{Array.from({ length: 8 }).map((_, i) => (<col key={i} style={{ width: '11%' }}/>))}</colgroup>
                                     <tbody>
                                       {(() => {
                                         let runningNbv = row.openingNbv;
@@ -319,18 +327,26 @@ export function AssetDetail() {
                                         const pisRaw = String(asset.taxFactPattern?.placedInService ?? '');
                                         const pisIso = /^(\d{4})-(\d{2})/.exec(pisRaw);
                                         const pisDate = pisIso ? null : new Date(pisRaw);
-                                        const pisIndex = pisIso
+                                        const pisIndexRaw = pisIso
                                             ? Number(pisIso[1]) * 12 + (Number(pisIso[2]) - 1)
                                             : (pisDate && !Number.isNaN(pisDate.getTime()) ? pisDate.getFullYear() * 12 + pisDate.getMonth() : null);
+                                        // Backdated Addition: the months before the month it was booked in are
+                                        // closed — nothing is posted there, so they are "not on the books" too.
+                                        const bookedIso = /^(\d{4})-(\d{2})/.exec(String(asset.taxFactPattern?.bookedPeriod ?? ''));
+                                        const bookedIndex = bookedIso ? Number(bookedIso[1]) * 12 + (Number(bookedIso[2]) - 1) : null;
+                                        const pisIndex = pisIndexRaw !== null && bookedIndex !== null ? Math.max(pisIndexRaw, bookedIndex) : pisIndexRaw;
                                         const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
                                         return (monthlyByYear[year] ?? []).map((m) => {
                                           const monthIdx = MONTH_NAMES.indexOf(String(m.month).slice(0, 3).toLowerCase());
                                           const notYetInService = pisIndex !== null && monthIdx >= 0 && year * 12 + monthIdx < pisIndex;
                                           if (notYetInService) {
                                             return (<tr key={m.month}>
-                                              <td>{m.month}</td>
+                                              <td style={{ paddingLeft: 14 }}>{m.month}</td>
                                               <td className="num" data-label="Opening NBV">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Rate">—</td>
+                                              <td className="num" data-label="Bonus">{formatCurrency(0, { compact: true })}</td>
+                                              <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(0, { compact: true })}</td>
+                                              <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Depreciation">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Accum. Depr">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Closing NBV">{formatCurrency(0, { compact: true })}</td>
@@ -341,9 +357,12 @@ export function AssetDetail() {
                                           runningNbv = closing;
                                           runningAccum = round2(runningAccum + m.value);
                                           return (<tr key={m.month}>
-                                            <td>{m.month}{m.projected ? ' *' : ''}</td>
+                                            <td style={{ paddingLeft: 14 }}>{m.month}{m.projected ? ' *' : ''}</td>
                                             <td className="num" data-label="Opening NBV">{formatCurrency(opening, { compact: true })}</td>
                                             <td className="num" data-label="Rate">{row.rate.toFixed(2)}%</td>
+                                            <td className="num" data-label="Bonus">{formatCurrency(m.bonus ?? 0, { compact: true })}</td>
+                                            <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(m.cyRevisionAbsorbed ?? m.revisionAbsorbed ?? 0, { compact: true })}</td>
+                                            <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(m.pyRevisionAbsorbed ?? 0, { compact: true })}</td>
                                             <td className="num" data-label="Depreciation">{formatCurrency(m.value, { compact: true })}</td>
                                             <td className="num" data-label="Accum. Depr">{formatCurrency(runningAccum, { compact: true })}</td>
                                             <td className="num" data-label="Closing NBV">{formatCurrency(closing, { compact: true })}</td>

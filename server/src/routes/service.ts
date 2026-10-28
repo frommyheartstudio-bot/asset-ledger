@@ -4,7 +4,10 @@
 //             post lifecycle events and read results back. Mounted at
 //             /api/service.
 //             WRITE
-//               POST /lifecycle/events       one event
+//               POST /lifecycle/additions | adjustments | transfers | retirements |
+//                    reinstatements | reclassifications   one event, ONE endpoint per type
+//                    (+ /bulk on each)                    -> routes/service-events/<event>.ts
+//               POST /lifecycle/events       one event, generic (eventType in body)
 //               POST /lifecycle/bulk-import  many rows, ONE event type
 //               POST /lifecycle/bulk-post    many rows, MIXED event types
 //             READ
@@ -30,11 +33,12 @@
 import express, { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireServiceKey } from '../middleware/serviceAuth.js';
-import type { ServiceIdentity } from '../middleware/serviceAuth.js';
 import { canonicalEvent, companyAllowed } from '../services/serviceAccounts.js';
-import { claimRef, cleanRef, completeRef, findRef, releaseRef } from '../services/serviceIdempotency.js';
-import { countLifecycleTransactions, fetchLifecycleTransactions, runBulkPost } from './lifecycle.js';
-import type { BulkPostRow, BulkPostResult } from './lifecycle.js';
+import { cleanRef, findRef } from '../services/serviceIdempotency.js';
+import { countLifecycleTransactions, fetchLifecycleTransactions } from './lifecycle.js';
+import { MAX_ROWS, identity, isPermitted, postedByOf, processRows, summarize, tooMany } from '../services/servicePipeline.js';
+import type { ServiceRow } from '../services/servicePipeline.js';
+import { serviceEventsRouter } from './service-events/index.js';
 import { assets, depreciationSchedules, ensureTaxFactPatterns, findAsset, persist, timelines } from '../data/assets.js';
 import { resolveBook } from '../data/books.js';
 import { ensureSchedules } from '../services/schedule-builder.js';
@@ -43,7 +47,6 @@ import { primeBookRules, scheduleForBook, viewAssetForBook, viewAssetsForBook } 
 export const serviceRouter = Router();
 
 const BODY_LIMIT = process.env.SERVICE_BODY_LIMIT || '10mb';
-const MAX_ROWS = Number(process.env.SERVICE_MAX_ROWS) > 0 ? Number(process.env.SERVICE_MAX_ROWS) : 500;
 const DEFAULT_PAGE = 100;
 const MAX_PAGE = 500;
 
@@ -52,189 +55,11 @@ const MAX_PAGE = 500;
 serviceRouter.use(express.json({ limit: BODY_LIMIT }));
 serviceRouter.use(requireServiceKey);
 
-const identity = (res: Response): ServiceIdentity => res.locals.service as ServiceIdentity;
-const postedByOf = (res: Response) => `svc:${identity(res).name}`;
+// One endpoint per event type (additions, adjustments, transfers, ...) - see routes/service-events/
+serviceRouter.use(serviceEventsRouter);
+console.log('[service-api] per-event routes loaded: POST /api/service/lifecycle/{additions,adjustments,transfers,retirements,reinstatements,reclassifications}[/bulk]');
 
-// canonical = "Addition" etc. Empty allowedEvents means every event type.
-const isPermitted = (res: Response, canonical: string) => {
-  const allowed = identity(res).allowedEvents;
-  return allowed.length === 0 || allowed.includes(canonical.toLowerCase());
-};
-
-// An asset is visible to the key when its company is allowed (empty list = every company).
 const canSeeAsset = (res: Response, company: unknown) => companyAllowed(identity(res).allowedCompanies, company);
-
-const tooMany = (n: number) => `Too many rows (${n}). Maximum per request is ${MAX_ROWS}; split the batch.`;
-
-// ======================================================
-// Row processing (shared by all three write endpoints)
-// ======================================================
-
-type ServiceRow = BulkPostRow & { externalRef?: unknown };
-type ServiceResult = BulkPostResult & {
-  externalRef?: string;
-  duplicate?: boolean;   // true = this externalRef was already posted; nothing new was written
-  code?: 'ref_conflict' | 'ref_in_progress'; // lets the single-event endpoint answer 409
-};
-
-function summarize(results: Array<{ status: 'posted' | 'failed' }>) {
-  const posted = results.filter((r) => r.status === 'posted').length;
-  return { total: results.length, posted, failed: results.length - posted };
-}
-
-// ======================================================
-// Function : companyBlockReason
-// Purpose  : Per-company limit of a key. Returns why this row may not be
-//            posted, or null when it is fine (always null for a key with
-//            no company limit).
-//              Addition       -> the company on the row (blank = '5B', the
-//                                same default the register uses) must be allowed
-//              other events   -> the asset's CURRENT company must be allowed
-//                                (an unknown asset is refused - a limited key
-//                                may not create placeholder assets)
-//              Transfer       -> the destination company must be allowed too
-//            batchAdditions = companies of Additions earlier in this same
-//            request (they post first, so later rows may refer to them).
-// ======================================================
-
-function companyBlockReason(
-  allowed: string[],
-  eventType: string,
-  assetNumber: string,
-  fields: Record<string, unknown>,
-  batchAdditions: Map<string, string>
-): string | null {
-  if (allowed.length === 0) return null;
-  const limit = `This API key may only use companies: ${allowed.join(', ')}`;
-
-  if (eventType === 'Addition') {
-    const company = typeof fields.company === 'string' && fields.company.trim() ? fields.company.trim() : '5B';
-    return companyAllowed(allowed, company) ? null : `${limit} (this Addition is for company ${company}).`;
-  }
-
-  const key = assetNumber.trim();
-  const company = findAsset(key)?.company ?? batchAdditions.get(key);
-  if (company === undefined) return `Asset ${key} was not found among the companies this API key may use.`;
-  if (!companyAllowed(allowed, company)) return `${limit} (asset ${key} belongs to company ${company}).`;
-
-  if (eventType === 'Transfer') {
-    const dest = typeof fields.destCompany === 'string' ? fields.destCompany.trim() : '';
-    if (dest && !companyAllowed(allowed, dest)) return `${limit} (destination company ${dest}).`;
-  }
-  return null;
-}
-
-// ======================================================
-// Function : processRows
-// Purpose  : The one place every write endpoint goes through:
-//              1. event type known + permitted for the key
-//              2. company limit of the key
-//              3. externalRef: a ref already posted returns its stored
-//                 outcome (duplicate: true) instead of posting again; a ref
-//                 reused for a different event is refused
-//              4. the remaining rows are posted by runBulkPost - the SAME
-//                 pipeline as the UI (Additions first, one row failing
-//                 never stops the others)
-//              5. refs of posted rows are remembered, refs of failed rows
-//                 are released so the caller can fix the data and retry
-//            Results come back in the original row order.
-// ======================================================
-
-async function processRows(rows: ServiceRow[], res: Response): Promise<ServiceResult[]> {
-  const svc = identity(res);
-  const postedBy = postedByOf(res);
-  const results: ServiceResult[] = new Array(rows.length);
-  const toPost: BulkPostRow[] = [];
-  const toPostIndex: number[] = [];
-  const claimed = new Map<number, string>();   // row index -> externalRef this request now owns
-  const refsInBatch = new Set<string>();
-  const batchAdditions = new Map<string, string>();
-
-  try {
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const assetNumber = typeof row.assetNumber === 'string' ? row.assetNumber : '';
-      const eventType = canonicalEvent(row.eventType);
-      const fields = (row.fields ?? {}) as Record<string, unknown>;
-
-      if (!eventType) {
-        results[i] = { assetNumber, eventType: String(row.eventType ?? ''), status: 'failed', error: row.eventType ? `Unknown event type "${row.eventType}"` : 'Missing Event Type' };
-        continue;
-      }
-      if (!assetNumber.trim()) {
-        results[i] = { assetNumber, eventType, status: 'failed', error: 'Missing Asset Number' };
-        continue;
-      }
-      if (!isPermitted(res, eventType)) {
-        results[i] = { assetNumber, eventType, status: 'failed', error: `This API key is not allowed to post ${eventType} events` };
-        continue;
-      }
-
-      let ref: string | null;
-      try { ref = cleanRef(row.externalRef); } catch (err) {
-        results[i] = { assetNumber, eventType, status: 'failed', error: err instanceof Error ? err.message : 'Invalid externalRef' };
-        continue;
-      }
-
-      const blocked = companyBlockReason(svc.allowedCompanies, eventType, assetNumber, fields, batchAdditions);
-      if (blocked) {
-        results[i] = { assetNumber, eventType, status: 'failed', error: blocked, ...(ref ? { externalRef: ref } : {}) };
-        continue;
-      }
-
-      if (ref) {
-        if (refsInBatch.has(ref)) {
-          results[i] = { assetNumber, eventType, status: 'failed', externalRef: ref, error: `externalRef "${ref}" appears more than once in this request - each event needs its own ref.` };
-          continue;
-        }
-        refsInBatch.add(ref);
-
-        const claim = await claimRef(svc.name, ref, eventType, assetNumber.trim());
-        if (!claim.claimed) {
-          const sameEvent = claim.eventType === eventType && claim.assetNumber === assetNumber.trim();
-          if (!sameEvent) {
-            results[i] = { assetNumber, eventType, status: 'failed', externalRef: ref, code: 'ref_conflict', error: `externalRef "${ref}" was already used for a different event (${claim.eventType} on ${claim.assetNumber}).` };
-          } else if (claim.state === 'posted') {
-            results[i] = { assetNumber, eventType, status: 'posted', externalRef: ref, duplicate: true };
-          } else {
-            results[i] = { assetNumber, eventType, status: 'failed', externalRef: ref, code: 'ref_in_progress', error: `externalRef "${ref}" is still being processed - retry in a moment.` };
-          }
-          continue;
-        }
-        claimed.set(i, ref);
-      }
-
-      if (eventType === 'Addition') {
-        const company = typeof fields.company === 'string' && fields.company.trim() ? fields.company.trim() : '5B';
-        batchAdditions.set(assetNumber.trim(), company);
-      }
-      toPost.push({ eventType, assetNumber, fields });
-      toPostIndex.push(i);
-    }
-
-    if (toPost.length > 0) {
-      const posted = await runBulkPost(toPost, postedBy);
-      for (let j = 0; j < posted.length; j++) {
-        const i = toPostIndex[j];
-        const ref = claimed.get(i);
-        results[i] = { ...posted[j], ...(ref ? { externalRef: ref } : {}) };
-        if (ref) {
-          if (posted[j].status === 'posted') {
-            await completeRef(svc.name, ref, { assetNumber: posted[j].assetNumber.trim(), eventType: posted[j].eventType, status: 'posted' });
-          } else {
-            await releaseRef(svc.name, ref);
-          }
-          claimed.delete(i);
-        }
-      }
-    }
-  } finally {
-    // Anything still claimed here means posting threw unexpectedly - free the refs so a retry works.
-    for (const ref of claimed.values()) await releaseRef(svc.name, ref).catch(() => undefined);
-  }
-
-  return results;
-}
 
 // POST /api/service/lifecycle/events
 // Body: { eventType: 'Adjustment', assetNumber: 'FA-1', externalRef?: 'INV-77', fields: { ... } }

@@ -1,0 +1,16 @@
+{
+  "_help": "SAP code -> our code. Edit freely, no code change needed (re-read on every fetch). Codes not listed pass through unchanged.",
+  "_note": "The entries below are DEMO values matching scripts/mock-sap-server.mjs. Replace them with the client's real company codes and asset classes.",
+  "companyCodes": {
+    "1000": "5B",
+    "2000": "R9",
+    "3000": "2D",
+    "4000": "GD"
+  },
+  "assetClasses": {
+    "3000": "00.12",
+    "3100": "00.11",
+    "3200": "00.13",
+    "3300": "00.241"
+  }
+}

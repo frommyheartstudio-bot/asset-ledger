@@ -42,7 +42,10 @@ export const NAV = [
     },
     {
         group: 'Integrations',
-        items: [{ id: 'sap', icon: '⇄', label: 'SAP', href: '/integrations/sap', capability: 'postEvents' }]
+        items: [
+            { id: 'sap', icon: '⇄', label: 'SAP', href: '/integrations/sap', capability: 'postEvents' },
+            { id: 'api', icon: '⌁', label: 'API', href: '/integrations/api', capability: 'postEvents' }
+        ]
     },
     { group: 'Administration', items: [{ id: 'users', icon: '◍', label: 'User Management', href: '/users', capability: 'manageUsers' }] }
 ];

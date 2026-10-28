@@ -47,6 +47,29 @@ let bookTablesReady = false;
 
 async function ensureBookTables(): Promise<void> {
   if (bookTablesReady) return;
+  // Accounting period an Addition was booked in (backdated-addition catch-up month).
+  // ALTER TABLE needs an exclusive lock even when the column already exists, so it can hang
+  // behind another open connection. Look first (no lock), and only ALTER when really missing,
+  // with a short lock_timeout so boot can never sit there forever.
+  const col = await pool.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'tfp_bookedPeriod'`
+  );
+  if (col.rowCount === 0) {
+    const c = await pool.connect();
+    try {
+      await c.query(`SET lock_timeout = '8s'`);
+      await c.query(`ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_bookedPeriod" DATE`);
+      console.log('[boot] added assets.tfp_bookedPeriod column');
+    } catch (err) {
+      throw new Error(
+        'Could not add column assets.tfp_bookedPeriod (another connection is locking the table). ' +
+        'Stop other server instances / DB tools, or run this once in the Postgres SQL editor: ' +
+        'ALTER TABLE assets ADD COLUMN IF NOT EXISTS "tfp_bookedPeriod" DATE;  — ' + (err instanceof Error ? err.message : String(err))
+      );
+    } finally {
+      c.release();
+    }
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS asset_book_entry (
     "assetNumber" TEXT NOT NULL, book TEXT NOT NULL,
     "ruleSource" TEXT NOT NULL DEFAULT 'stored', "ruleName" TEXT NOT NULL DEFAULT '',
@@ -155,7 +178,8 @@ export async function hydrate(): Promise<CoreSnapshot> {
         convention: String(r.tfp_convention ?? ''),
         bonusPct: n(r.tfp_bonusPct),
         annualRate: n(r.tfp_annualRate),
-        propertyType: String(r.tfp_propertyType ?? '')
+        propertyType: String(r.tfp_propertyType ?? ''),
+        ...(r.tfp_bookedPeriod ? { bookedPeriod: dateOnly(r.tfp_bookedPeriod) } : {})
       };
     }
 
@@ -282,9 +306,9 @@ export async function flush(snapshot: CoreSnapshot): Promise<void> {
           `INSERT INTO assets (
              "assetNumber", description, "assetClass", company, "costCenter", location, project,
              cost, "accumDepreciation", nbv, method, status,
-             "tfp_placedInService", "tfp_recoveryPeriod", "tfp_method", "tfp_convention", "tfp_bonusPct", "tfp_annualRate", "tfp_propertyType",
+             "tfp_placedInService", "tfp_recoveryPeriod", "tfp_method", "tfp_convention", "tfp_bonusPct", "tfp_annualRate", "tfp_propertyType", "tfp_bookedPeriod",
              "disp_disposalDate", "disp_adAtDisposal", "disp_gainLoss", "updatedAt"
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22, now())
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23, now())
            ON CONFLICT ("assetNumber") DO UPDATE SET
              description = EXCLUDED.description,
              "assetClass" = EXCLUDED."assetClass",
@@ -304,6 +328,7 @@ export async function flush(snapshot: CoreSnapshot): Promise<void> {
              "tfp_bonusPct" = EXCLUDED."tfp_bonusPct",
              "tfp_annualRate" = EXCLUDED."tfp_annualRate",
              "tfp_propertyType" = EXCLUDED."tfp_propertyType",
+             "tfp_bookedPeriod" = EXCLUDED."tfp_bookedPeriod",
              "disp_disposalDate" = EXCLUDED."disp_disposalDate",
              "disp_adAtDisposal" = EXCLUDED."disp_adAtDisposal",
              "disp_gainLoss" = EXCLUDED."disp_gainLoss",
@@ -328,6 +353,7 @@ export async function flush(snapshot: CoreSnapshot): Promise<void> {
             a.taxFactPattern?.bonusPct ?? null,
             a.taxFactPattern?.annualRate ?? null,
             a.taxFactPattern?.propertyType ?? null,
+            toDateOrNull(a.taxFactPattern?.bookedPeriod),
             toDateOrNull(a.disposal?.disposalDate),
             a.disposal?.adAtDisposal ?? null,
             a.disposal?.gainLoss ?? null

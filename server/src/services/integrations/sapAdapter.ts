@@ -15,6 +15,7 @@
 
 import { loadAssetClasses } from '../../db/repo.js';
 import { listAssetTypes } from '../assetTypeConfig.js';
+import { normalizeSapRecord } from './sapNormalize.js';
 
 export interface SapRecord {
   documentId: string;      // unique SAP document no. — used to stop double imports
@@ -60,7 +61,8 @@ export async function fetchSapRecords(range: { from?: string; to?: string }): Pr
   const body = (await res.json()) as unknown;
   const list = Array.isArray(body) ? body : (body as { records?: unknown }).records;
   if (!Array.isArray(list)) throw new Error('SAP response was not a list of records');
-  return list as SapRecord[];
+  // SAP column names / date / number styles -> our SapRecord (sapNormalize.ts)
+  return list.map((row) => normalizeSapRecord(row as Record<string, unknown>));
 }
 
 // ---------- mapping SAP record -> Addition fields ----------

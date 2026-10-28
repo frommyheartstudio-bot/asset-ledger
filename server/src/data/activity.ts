@@ -5,7 +5,7 @@
 
 import type { Asset, DepreciationScheduleRow, LifecycleActivity } from '../types.js';
 import { assets, depreciationSchedules } from './assets.js';
-import { ensureSchedules, inServiceDate, round2, toISODate } from '../services/schedule-builder.js';
+import { bookedYearSplit, bookedContext, ensureSchedules, inServiceDate, round2, toISODate } from '../services/schedule-builder.js';
 import { DEFAULT_BOOK } from './books.js';
 import { classLabel } from '../services/assetClassLabels.js';
 import { scheduleForBook, viewAssetForBook } from '../services/book-view.js';
@@ -136,7 +136,7 @@ export function monthsInServiceDuringYear(
 //            schedule at all.
 // ======================================================
 
-function assetDepreciationForMonth(
+export function assetDepreciationForMonth(
   a: Asset,
   monthStart: string,
   monthEnd: string,
@@ -161,6 +161,15 @@ function assetDepreciationForMonth(
 
   const yearRow = rows.find((r) => r.year.startsWith(monthYear));
   if (yearRow && yearRow.depreciation > 0) {
+    // Addition booked after its in-service month (backdated) or with bonus: nothing
+    // before the booked month; the catch-up (bonus + missed regular) is posted in the
+    // booked month together with that month's own depreciation, then the usual monthly amount.
+    const split = bookedYearSplit(a, yearRow.depreciation);
+    if (split && split.bookedYear === Number(monthYear)) {
+      const month = Number(monthEnd.slice(5, 7)); // monthEnd, not monthStart: monthStart can slip a day back in +UTC timezones
+      if (month < split.bookedMonth) return 0;
+      return month === split.bookedMonth ? split.catchUp + split.monthly : split.monthly;
+    }
     const activeMonthsThisYear = monthsInServiceDuringYear(a, monthYear);
     return yearRow.depreciation / activeMonthsThisYear;
   }
@@ -301,9 +310,31 @@ export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: numbe
       (monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() > today.getMonth());
     const value = round2(assetDepreciationForMonth(view, monthStart, monthEnd, monthYear, rows));
 
+    // Bonus (AFYD) and Revision Absorbed are posted in the booked month only.
+    let bonus = 0;
+    let revisionAbsorbed = 0;
+    let cyRevisionAbsorbed = 0;
+    let pyRevisionAbsorbed = 0;
+    const ctx = bookedContext(view);
+    const yearRow = rows.find((r) => r.year.startsWith(String(year)));
+    if (ctx && yearRow && ctx.bookedYear === year && ctx.bookedMonth === monthDate.getMonth() + 1) {
+      const split = bookedYearSplit(view, yearRow.depreciation);
+      if (split) {
+        bonus = split.afyd;
+        const backdated = split.bookedYear * 12 + split.bookedMonth > ctx.pisdYear * 12 + ctx.pisdMonth;
+        revisionAbsorbed = backdated ? round2(split.afyd + split.missedRegular) : 0;
+        cyRevisionAbsorbed = backdated ? round2(split.afyd + split.cyRegular) : 0;
+        pyRevisionAbsorbed = backdated ? split.pyRegular : 0;
+      }
+    }
+
     return {
       month: monthDate.toLocaleString('en-US', { month: 'long' }),
       shortMonth: monthDate.toLocaleString('en-US', { month: 'short' }),
+      bonus,
+      revisionAbsorbed,
+      cyRevisionAbsorbed,
+      pyRevisionAbsorbed,
       value,
       valueLabel: compactMoney(value),
       projected

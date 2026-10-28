@@ -34,7 +34,23 @@ If there are no service accounts and no `SERVICE_API_KEYS`, every call returns *
 Header `x-api-key: <key>` on every request. Missing / invalid / disabled / expired key -> **401**.
 `postedBy` in the body is ignored; Posted By always comes from the account name.
 
-### POST /api/service/lifecycle/events — one event
+### One endpoint per event type (recommended)
+Each event has its **own route, its own required fields and its own validation** (code: `src/routes/service-events/<event>.ts`).
+`eventType` is **not** sent - the URL decides it. Body is always `{ "assetNumber", "externalRef"?, "fields": { } }`.
+
+| Event | Single | Many (same event) | You must always send | Filled from the register if left out |
+|---|---|---|---|---|
+| Addition | `POST /api/service/lifecycle/additions` | same URL (send `{ "rows": [...] }`) | `cost`, `placedInService`, `accountingPeriodDate` | nothing (new asset) |
+| Adjustment | `POST /api/service/lifecycle/adjustments` | same URL (send `{ "rows": [...] }`) | `adjustmentAmount` (not 0), `effectiveDate` | original cost, PISD, life, bonus %, type, convention |
+| Transfer | `POST /api/service/lifecycle/transfers` | same URL (send `{ "rows": [...] }`) | `transferDate`, `costTransferred`, `destCompany` or `destLocation` | total cost, PISD, life, source company/location |
+| Retirement | `POST /api/service/lifecycle/retirements` | same URL (send `{ "rows": [...] }`) | `disposalDate` (`proceeds` optional) | cost, cost disposed, PISD, recovery period, bonus %, type |
+| Reinstatement | `POST /api/service/lifecycle/reinstatements` | same URL (send `{ "rows": [...] }`) | `reinstatementDate` | original cost, PISD, life, original disposal data |
+| Reclassification | `POST /api/service/lifecycle/reclassifications` | same URL (send `{ "rows": [...] }`) | `effectiveDate`, `newAssetType` | original cost, PISD, all `old*` values |
+
+Same status codes, `externalRef` retry safety, company limits and key event limits as below. A missing/invalid field is **400** (single) or a failed row (bulk).
+A ready Postman collection with one folder per event: `server/postman/AssetLedger-Service-API.postman_collection.json` (set `baseUrl`, `apiKey`).
+
+### POST /api/service/lifecycle/events — one event (generic, still supported)
 ```json
 { "eventType": "Adjustment", "assetNumber": "FA-1001", "fields": { } }
 ```

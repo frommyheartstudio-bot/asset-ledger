@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { assets, depreciationSchedules, ensureTaxFactPatterns, findAsset, persist, timelines } from '../data/assets.js';
 import { computeAssetMonthlyDepreciationForYear } from '../data/activity.js';
-import { ensureSchedules } from '../services/schedule-builder.js';
+import { ensureSchedules, withBonusAndRevision } from '../services/schedule-builder.js';
 import { resolveBook } from '../data/books.js';
 import { primeBookRules, scheduleForBook, syncBookEntries, viewAssetForBook, viewAssetsForBook } from '../services/book-view.js';
 
@@ -113,11 +113,12 @@ assetsRouter.get('/:assetNumber', async (req, res) => {
     const filled = ensureTaxFactPatterns([asset], depreciationSchedules);
     if (filled.length > 0) persist();
   }
+  const view = viewAssetForBook(asset, book);
   res.json({
     book,
-    asset: viewAssetForBook(asset, book),
+    asset: view,
     timeline: timelines[asset.assetNumber] ?? [],
-    depreciationSchedule: scheduleForBook(asset, book)
+    depreciationSchedule: withBonusAndRevision(view, scheduleForBook(asset, book))
   });
 });
 

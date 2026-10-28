@@ -14,6 +14,7 @@
     "db:seed:assets": "tsx --env-file=.env scripts/migrate-to-postgres.ts db/seed-assets.json",
     "test:engine": "tsx --env-file=.env scripts/run-engine-tests.ts",
     "db:check": "tsx --env-file=.env scripts/check-postgres.ts",
+    "mock-sap": "node scripts/mock-sap-server.mjs",
     "service-account": "tsx --env-file=.env scripts/service-accounts.ts",
     "test": "vitest run",
     "test:calc": "vitest run tests/calc-engine.test.ts",
