@@ -43,6 +43,12 @@ app.use('/api/service', serviceRouter);
 
 app.use(express.json());
 
+// Root URL - this server is the API only (the UI is the separate static site),
+// so answer with a small JSON message instead of "Cannot GET /".
+app.get('/', (_req, res) => {
+  res.json({ name: 'AssetLedger API', status: 'running', health: '/api/health' });
+});
+
 app.get('/api/health', async (_req, res) => {
   const postgres = await pingPostgres();
   res.status(postgres ? 200 : 503).json({ ok: postgres, postgres });
