@@ -333,7 +333,11 @@ a:hover { text-decoration: underline; }
   box-sizing: border-box; width: 100%; max-width: 340px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.pub946-table-wrap { overflow-x: auto; }
+.pub946-table-wrap {
+  overflow-x: auto; overflow-y: hidden; max-height: none;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x pan-y;
+}
+.pub946-swipe-hint { display: none; }
 .pub946-table { font-size: 12px; white-space: nowrap; }
 .pub946-table th:first-child, .pub946-table td:first-child {
   position: sticky; left: 0; z-index: 1; background: var(--card);
@@ -494,6 +498,97 @@ select.btn { cursor: pointer; }
   }
   .pub946-table-wrap .table td::before { content: none; }
   .pub946-table-wrap .table td:first-child { padding-top: 7px; text-align: left; }
+}
+
+/* ---------- Pager ---------- */
+.pager {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  border-top: 1px solid var(--border); background: #f8fafc; border-radius: 0 0 var(--radius) var(--radius);
+}
+.pager-range { font-size: 12.5px; color: var(--text-muted); margin-right: auto; }
+.pager-range b { color: var(--text); font-weight: 600; }
+.pager-size {
+  font-size: 12.5px; font-weight: 600; color: var(--text); background: var(--card);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; cursor: pointer;
+}
+.pager-stepper {
+  display: inline-flex; align-items: stretch; background: var(--card);
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.pager-btn {
+  width: 40px; border: none; background: transparent; color: var(--accent);
+  font-size: 22px; line-height: 1; cursor: pointer; font-family: inherit;
+}
+.pager-btn:hover:not(:disabled) { background: #eff6ff; }
+.pager-btn:disabled { color: var(--text-light); opacity: .55; cursor: not-allowed; }
+.pager-current {
+  display: flex; align-items: center; justify-content: center; padding: 0 14px; min-height: 38px;
+  font-size: 12.5px; color: var(--text-muted); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.pager-current b { color: var(--text); margin: 0 3px; }
+
+/* ---------- Mobile polish (added) ---------- */
+@media (max-width: 767px) {
+  /* iOS Safari zooms the page when a focused field is < 16px */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+
+  /* Selection checkbox: pinned to the card's top-right corner instead of
+     being rendered as the card heading with an empty label. */
+  .table tr { position: relative; }
+  .table td.checkbox-col {
+    position: absolute; top: 10px; right: 12px; width: auto; padding: 0;
+    border: none; margin: 0; z-index: 1;
+  }
+  .table td.checkbox-col::before { content: none; }
+  .table td.checkbox-col input[type="checkbox"] { width: 20px; height: 20px; }
+  /* the first real column becomes the card heading when a checkbox precedes it */
+  .table td.checkbox-col + td {
+    justify-content: flex-start; font-weight: 700; font-size: 13px;
+    border-bottom: 1px solid var(--border); padding-top: 0; padding-bottom: 8px; margin-bottom: 4px;
+    padding-right: 32px;
+  }
+  .table td.checkbox-col + td::before { content: none; }
+
+  /* Inline fixed-width inputs inside stacked table cards must shrink */
+  .table td > input:not([type="checkbox"]):not([type="radio"]), .table td > select, .table td > textarea {
+    flex: 1 1 0; min-width: 0; max-width: 100%; width: auto !important;
+  }
+
+  /* Comfortable tap targets */
+  .btn { min-height: 38px; }
+  .btn-sm { min-height: 34px; }
+  .row-icon-btn { width: 36px; height: 36px; }
+
+  /* Multi-select dropdown options may wrap instead of overflowing */
+  .multiselect-panel { max-width: calc(100vw - 32px); }
+  .multiselect-option { white-space: normal; padding: 9px 8px; }
+
+  /* Long values (descriptions, emails) wrap inside the card */
+  .table td { overflow-wrap: anywhere; }
+
+  /* Pager: range + page size on top, full-width stepper below */
+  .pager { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 12px 14px; }
+  .pager-range { margin-right: 0; align-self: center; }
+  .pager-size { font-size: 16px; min-height: 40px; }
+  .pager-stepper { grid-column: 1 / -1; }
+  .pager-btn { width: 56px; min-height: 46px; font-size: 26px; }
+  .pager-current { flex: 1; font-size: 13.5px; }
+
+  /* Pub 946 grid: scrolls sideways inside its own box, page scrolls vertically */
+  .pub946-table-wrap { max-height: none; overflow-y: hidden; }
+  .pub946-table-wrap .table tr { position: static; }
+  .pub946-table-wrap .table td { overflow-wrap: normal; }
+  .pub946-swipe-hint { display: block; padding: 6px 14px; font-size: 11px; color: var(--text-muted); text-align: center; background: #f8fafc; border-top: 1px solid var(--border); }
+
+  /* Modals use the full width */
+  .card[style*="maxWidth: 92vw"], .card[style*="max-width: 92vw"] { width: calc(100vw - 16px) !important; max-width: calc(100vw - 16px) !important; }
+}
+
+/* Tablet: 4/5-column inline filter grids are too tight with the sidebar hidden */
+@media (min-width: 768px) and (max-width: 1000px) {
+  .form-grid[style*="repeat(5"] { grid-template-columns: repeat(3, 1fr) !important; }
+  .form-grid[style*="repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
 @media (max-width: 480px) {

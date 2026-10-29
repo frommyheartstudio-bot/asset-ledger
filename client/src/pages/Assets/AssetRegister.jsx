@@ -16,6 +16,7 @@ import { AssetTable } from '../../components/asset/AssetTable';
 import { useAssets } from '../../hooks/useAssets';
 import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { useAuth } from '../../context/AuthContext';
+import { PagerBar } from '../../components/ui/Pagination';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook } from '../../hooks/useBooks';
 import { useFormOptions } from '../../hooks/useFormOptions';
@@ -207,7 +208,7 @@ export function AssetRegister() {
       {!error && (<div className="card">
           <div className="card-head">
             <h3>Assets</h3>
-            <div className="flex items-center gap-2">
+            <div className="card-head-controls">
               <BookSelect value={book} onChange={setBook} disabled={loading}/>
               {selectedKeys.size > 0 && (<span className="text-sm text-muted">{selectedKeys.size} selected</span>)}
               <span className="text-sm text-muted">
@@ -229,22 +230,7 @@ export function AssetRegister() {
 
           {!loading && filteredItems.length > 0 && (<div className="table-paged"><AssetTable assets={pageItems} onSelect={(a) => navigate(`/assets/${a.assetNumber}${book !== getDefaultBook() ? `?book=${encodeURIComponent(book)}` : ''}`)} selection={selection}/></div>)}
 
-          <div className="card-pad flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted">Page {currentPage} of {totalPages}</span>
-              <select className="btn btn-ghost btn-sm" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page">
-                {[10, 25, 50, 100].map((n) => (<option key={n} value={n}>{n} / page</option>))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setPage(currentPage - 1)} disabled={currentPage <= 1}>
-                ‹ Prev
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= totalPages}>
-                Next ›
-              </Button>
-            </div>
-          </div>
+          <PagerBar total={filteredItems.length} page={currentPage} totalPages={totalPages} pageSize={pageSize} setPage={setPage} setPageSize={setPageSize}/>
         </div>)}
     </AppLayout>);
 }

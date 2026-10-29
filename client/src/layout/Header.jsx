@@ -132,7 +132,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
       {showMenuToggle && (<button className="icon-btn menu-toggle" title={menuOpen ? 'Close menu' : 'Menu'} aria-label="Toggle navigation" aria-expanded={!!menuOpen} onClick={onMenuClick}>
         {menuOpen ? '✕' : '☰'}
       </button>)}
-      <div>
+      <div className="topbar-titles">
         <div className="page-title">{title}</div>
         <div className="breadcrumb">{crumb ?? ''}</div>
       </div>
@@ -148,7 +148,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
         {query && (<button type="button" className="search-clear" title="Clear search" aria-label="Clear search" onClick={clearSearch}>✕</button>)}
       </div>
       <div className={`icon-btn notif-btn ${canSeeLogins ? '' : 'notif-btn-static'}`} title="Notifications" ref={notifRef} onClick={canSeeLogins ? toggleNotifications : undefined} style={{ position: 'relative', cursor: canSeeLogins ? 'pointer' : 'default' }}>
-        ◔{unseenLogins.length > 0 && <span className="badge-dot"/>}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>{unseenLogins.length > 0 && <span className="badge-dot"/>}
         {notifOpen && (<div className="account-dropdown notif-dropdown">
             <div className="account-dropdown-who">Notifications</div>
             {logins.length === 0 && <div className="notif-empty">Nothing yet.</div>}

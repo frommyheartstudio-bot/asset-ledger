@@ -77,6 +77,11 @@
 }
 .topbar .page-title { font-size: 18px; font-weight: 700; color: var(--text); }
 .topbar .breadcrumb { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+/* long titles/breadcrumbs truncate instead of pushing the icons off-screen */
+.topbar .topbar-titles { min-width: 0; flex: 0 1 auto; }
+.topbar .topbar-titles .page-title,
+.topbar .topbar-titles .breadcrumb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .menu-toggle, .topbar .icon-btn, .topbar .account-menu { flex-shrink: 0; }
 .topbar .spacer { flex: 1; }
 .topbar .search {
   display: flex; align-items: center; gap: 8px;
@@ -198,6 +203,21 @@
 
   .topbar { left: 0; padding: 0 14px; gap: 10px; }
   .topbar .page-title { font-size: 16px; }
+  .account-dropdown { max-width: calc(100vw - 24px); }
+
+  /* Notifications: a full-width sheet under the top bar instead of a 280px
+     box anchored to the bell (which pushed it off the left edge). */
+  .notif-dropdown {
+    position: fixed; top: 66px; left: 8px; right: 8px; width: auto; max-width: none;
+    max-height: calc(100vh - 66px - 58px - 16px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 66px - 58px - 16px - env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+  }
+  .notif-item { padding: 12px 40px 12px 14px; font-size: 13px; overflow-wrap: anywhere; }
+  .notif-close { top: 8px; right: 8px; width: 32px; height: 32px; font-size: 14px; }
+
+  /* leave room under the last row for the floating chat / AI buttons */
+  .main .content { padding-bottom: 84px; }
 }
 
 @media (max-width: 767px) {

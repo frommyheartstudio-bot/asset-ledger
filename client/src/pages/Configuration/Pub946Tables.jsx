@@ -102,7 +102,8 @@ export function Pub946Tables() {
           <div className="card-pad" style={{ paddingTop: 0, paddingBottom: 4 }}>
             <p className="text-muted text-sm">{table.subtitle}</p>
           </div>
-          <div className="table-wrap pub946-table-wrap">
+          <p className="pub946-swipe-hint">← Swipe sideways to see all columns →</p>
+          <div className="table-wrap pub946-table-wrap" tabIndex={0}>
             <table className="table pub946-table">
               <thead>
                 <tr>

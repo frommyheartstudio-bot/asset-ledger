@@ -522,7 +522,7 @@ export function Reporting() {
             {getBookNames().map((b) => (<option key={b}>{b}</option>))}
           </select>
         </div>
-        {visibleRecent.length === 0 ? (<EmptyState title="No reports generated yet" description="Reports you generate will show up here."/>) : (<Table columns={columns} rows={visibleRecent} rowKey={(r) => `${r.name}-${r.date}`}/>)}
+        {visibleRecent.length === 0 ? (<EmptyState title="No reports generated yet" description="Reports you generate will show up here."/>) : (<Table columns={columns} rows={visibleRecent} rowKey={(r, i) => r.id ?? `${r.name}-${r.date}-${i}`}/>)}
       </div>
 
       <NewReportCard open={modalOpen} onClose={() => setModalOpen(false)} allAssets={allAssets} onGenerated={handleGenerated} initialName={presetName}/>

@@ -46,10 +46,10 @@ export function Table({ columns, rows, rowKey, onRowClick, selection, paginate =
           </tr>
         </thead>
         <tbody>
-          {shown.map((row) => {
-            const key = rowKey(row);
+          {shown.map((row, idx) => {
+            const key = rowKey(row, idx);
             return (<tr key={key} onClick={onRowClick ? () => onRowClick(row) : undefined}>
-              {selection && (<td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
+              {selection && (<td className="checkbox-col" data-label="" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={selection.selectedKeys.has(key)} onChange={() => selection.onToggleRow(key)} aria-label={`Select row ${key}`}/>
                 </td>)}
               {columns.map((c) => (<td key={c.header} className={c.numeric ? 'num' : ''} data-label={c.header}>

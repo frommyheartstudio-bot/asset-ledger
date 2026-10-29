@@ -55,9 +55,12 @@
 
 /* Mobile: lift above the bottom nav */
 @media (max-width: 1000px) {
-  .chat-fab { bottom: 76px; right: 14px; width: 52px; height: 52px; }
-  .chat-fab.agent { right: 76px; }
-  .chat-panel { right: 12px; bottom: 140px; height: calc(100vh - 220px); }
+  .chat-fab { bottom: 70px; right: 10px; width: 44px; height: 44px; opacity: .92; }
+  .chat-fab.agent { right: 62px; }
+  .chat-panel {
+    left: 8px; right: 8px; bottom: 122px; width: auto; max-width: none;
+    height: calc(100vh - 200px); height: calc(100dvh - 200px);
+  }
 }
 
 .chat-link { display: block; margin-top: 8px; background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; }

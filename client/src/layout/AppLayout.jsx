@@ -8,6 +8,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { BottomNav } from './BottomNav';
+import { useAutoTableLabels } from '../hooks/useAutoTableLabels';
 import { ChatLaunchers } from '../components/chat/ChatWidget';
 import './layout.css';
 
@@ -47,6 +48,7 @@ function useIsMobile() {
 export function AppLayout({ active, title, crumb, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const isMobile = useIsMobile();
+    useAutoTableLabels();
     return (<div className="app">
       <Sidebar active={active} open={sidebarOpen} onClose={() => setSidebarOpen(false)}/>
       <div className="main">

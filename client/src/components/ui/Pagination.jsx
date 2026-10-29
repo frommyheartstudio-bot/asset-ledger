@@ -39,24 +39,34 @@ export function usePagination(items, initialSize = 10) {
 }
 
 // ======================================================
-// Function : Pagination
-// Purpose  : Page x of y bar with rows-per-page select and Prev / Next buttons; hidden when everything fits on one page.
+// Function : PagerBar
+// Purpose  : Presentational pager: "Showing 1–10 of 21", rows-per-page select
+//            and a  ‹  Page 1 of 3  ›  stepper. Used by Pagination and by the
+//            Asset Register (which paginates its own list).
 // ======================================================
-export function Pagination({ total, page, totalPages, pageSize, setPage, setPageSize }) {
-    if (total <= PAGE_SIZES[0]) return null;
-    return (<div className="card-pad flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 8 }}>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted">Page {page} of {totalPages}</span>
-        <select className="btn btn-ghost btn-sm" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page">
-          {PAGE_SIZES.map((n) => (<option key={n} value={n}>{n} / page</option>))}
-        </select>
-        <span className="text-sm text-muted">{total} rows</span>
-      </div>
-      <div className="flex gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>‹ Prev</Button>
-        <Button variant="ghost" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>Next ›</Button>
+export function PagerBar({ total, page, totalPages, pageSize, setPage, setPageSize, sizes = PAGE_SIZES }) {
+    const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+    const end = Math.min(total, page * pageSize);
+    return (<div className="pager">
+      <div className="pager-range">Showing <b>{start}–{end}</b> of <b>{total.toLocaleString()}</b></div>
+      <select className="pager-size" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page">
+        {sizes.map((n) => (<option key={n} value={n}>{n} / page</option>))}
+      </select>
+      <div className="pager-stepper" role="navigation" aria-label="Pagination">
+        <button type="button" className="pager-btn" onClick={() => setPage(page - 1)} disabled={page <= 1} aria-label="Previous page">‹</button>
+        <span className="pager-current">Page <b>{page}</b> of {totalPages}</span>
+        <button type="button" className="pager-btn" onClick={() => setPage(page + 1)} disabled={page >= totalPages} aria-label="Next page">›</button>
       </div>
     </div>);
+}
+
+// ======================================================
+// Function : Pagination
+// Purpose  : PagerBar that hides itself when everything fits on one page.
+// ======================================================
+export function Pagination(props) {
+    if (props.total <= PAGE_SIZES[0]) return null;
+    return <PagerBar {...props}/>;
 }
 
 // ======================================================
