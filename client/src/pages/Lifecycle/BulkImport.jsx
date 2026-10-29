@@ -99,6 +99,8 @@ function findDuplicateAssetNumbers(rows) {
 // ======================================================
 
 function EventImportCard({ evt, user }) {
+    const { hasEdit } = useAuth();
+    const canImport = hasEdit('bulk-import');
     const schema = FIELD_SCHEMAS[evt.id] ?? [];
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState([]); // parsed CSV rows (raw, header-keyed)
@@ -246,6 +248,8 @@ function EventImportCard({ evt, user }) {
 // ======================================================
 
 function MasterDataSetImportCard({ user }) {
+    const { hasEdit } = useAuth();
+    const canImport = hasEdit('bulk-import');
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState([]); // filled rows, each tagged with its CSV line number
     const [parseError, setParseError] = useState('');
@@ -283,11 +287,13 @@ function MasterDataSetImportCard({ user }) {
         setFileName(file.name);
         file.text().then((text) => {
             try {
-                const { rows: parsed, headerWasMissing } = parseCsv(text, getUnifiedHeaders());
-                // Line number in the file (header is line 1) so problems can be
-                // pointed at exactly; rows with neither asset # nor eventType are blank.
+                const { rows: parsed, rowLines, headerWasMissing } = parseCsv(text, getUnifiedHeaders());
+                // Real line number in the file (taken from the parser, so skipped
+                // blank lines and multi-line cells don't throw the count off) so
+                // problems can be pointed at exactly; rows with neither
+                // asset # nor eventType are blank.
                 const filled = parsed
-                    .map((r, idx) => ({ ...r, __line: idx + 2 }))
+                    .map((r, idx) => ({ ...r, __line: rowLines[idx] }))
                     .filter((r) => r.assetNumber?.trim() || r.eventType?.trim());
                 if (filled.length === 0) {
                     setParseError('No transactions found — every row needs an assetNumber and an eventType.');

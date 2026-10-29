@@ -4,13 +4,25 @@
 // ======================================================
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../api/auth.api';
 
 // ======================================================
 // START: Layout Component
 // ======================================================
+
+// Header search text survives page changes (cleared only by the X button).
+const SEARCH_KEY = 'al_header_search';
+function readSavedQuery() {
+    try { return sessionStorage.getItem(SEARCH_KEY) || ''; } catch { return ''; }
+}
+function saveQuery(value) {
+    try {
+        if (value) sessionStorage.setItem(SEARCH_KEY, value);
+        else sessionStorage.removeItem(SEARCH_KEY);
+    } catch { /* storage unavailable - the box still works for this page */ }
+}
 
 // ======================================================
 // Function : Header
@@ -20,7 +32,12 @@ import { authApi } from '../api/auth.api';
 export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) {
     const { user, logout, hasView } = useAuth();
     const navigate = useNavigate();
-    const [query, setQuery] = useState('');
+    const location = useLocation();
+    // The header is re-mounted on every page change, so a plain useState('')
+    // wiped what the person typed the moment the search jumped to the Asset
+    // Register. The text now lives in sessionStorage and is only removed
+    // by the X button.
+    const [query, setQuery] = useState(readSavedQuery);
     const [menuIsOpen, setMenuIsOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -96,12 +113,36 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
         return () => document.removeEventListener('mousedown', handleClick);
     }, [menuIsOpen, notifOpen]);
 
+    // On the Asset Register the box mirrors whatever search is applied in
+    // the URL (also covers searching from the page's own Search button).
+    useEffect(() => {
+        if (location.pathname !== '/assets') return;
+        const fromUrl = new URLSearchParams(location.search).get('q');
+        if (fromUrl) { setQuery(fromUrl); saveQuery(fromUrl); }
+    }, [location.pathname, location.search]);
+
+    const updateQuery = (value) => { setQuery(value); saveQuery(value); };
+
     // Global quick-search: Enter jumps to the Asset Register pre-filtered
     // by asset number / description. Filters are applied server-side.
     const runSearch = () => {
         const q = query.trim();
         if (!q) return;
+        saveQuery(q);
         navigate(`/assets?q=${encodeURIComponent(q)}`);
+    };
+
+    // X button: the only thing that empties the box. Also drops the
+    // applied search from the Asset Register so the table shows everything again.
+    const clearSearch = () => {
+        setQuery('');
+        saveQuery('');
+        if (location.pathname === '/assets' && new URLSearchParams(location.search).get('q')) {
+            const next = new URLSearchParams(location.search);
+            next.delete('q');
+            const qs = next.toString();
+            navigate(`/assets${qs ? `?${qs}` : ''}`, { replace: true });
+        }
     };
 
     const handleLogout = () => {
@@ -124,9 +165,10 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
         <input
           placeholder="Search assets"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => updateQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSearch()}
         />
+        {query && (<button type="button" className="search-clear" title="Clear search" aria-label="Clear search" onClick={clearSearch}>✕</button>)}
       </div>
       <div className={`icon-btn notif-btn ${canSeeLogins ? '' : 'notif-btn-static'}`} title="Notifications" ref={notifRef} onClick={canSeeLogins ? toggleNotifications : undefined} style={{ position: 'relative', cursor: canSeeLogins ? 'pointer' : 'default' }}>
         ◔{unseenLogins.length > 0 && <span className="badge-dot"/>}

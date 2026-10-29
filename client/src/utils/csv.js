@@ -56,66 +56,136 @@ export function eventLabelForId(id) {
 // ======================================================
 // Function : parseCsv
 // Purpose  : Parses CSV text into an array of header-keyed objects.
-//            Handles quoted fields (so values containing commas are
-//            safe), but assumes one record per line like every export
-//            from Excel/Sheets already produces.
+//            Reads EVERY line of the file character by character, so it
+//            copes with what Excel / Sheets / Notepad really produce:
+//              - UTF-8 BOM at the start of the file
+//              - Windows (\r\n), Unix (\n) and old Mac (\r) line endings
+//              - quoted cells that contain commas, quotes or line breaks
+//              - comma, semicolon or tab separated files
+//              - rows that are only commas (",,,,") or only spaces — these
+//                are skipped instead of showing up as blank rows
+//              - header names typed in another case / with spaces or
+//                underscores ("Asset Number", "ASSET_NUMBER") — they are
+//                matched back to the real column keys
+//            Also returns `rowLines` — the 1-based line of the file each
+//            returned row came from — so messages can point at the exact line.
 // ======================================================
 
-export function parseCsv(text, expectedHeaders = null) {
-    const lines = text.replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim().length > 0);
-    if (lines.length === 0) return { headers: [], rows: [] };
+const normHeader = (h) => String(h ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    const parseLine = (line) => {
-        const cells = [];
-        let cur = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (inQuotes) {
-                if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-                else if (ch === '"') { inQuotes = false; }
-                else { cur += ch; }
-            } else if (ch === '"') {
-                inQuotes = true;
-            } else if (ch === ',') {
-                cells.push(cur);
-                cur = '';
-            } else {
+function detectDelimiter(text) {
+    // Look at the first non-empty line, outside quotes, and pick whichever
+    // separator appears most (comma wins ties — the normal case).
+    const counts = { ',': 0, ';': 0, '\t': 0 };
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '"') inQuotes = !inQuotes;
+        else if (!inQuotes && (ch === '\n' || ch === '\r')) {
+            if (counts[','] + counts[';'] + counts['\t'] > 0) break;
+        } else if (!inQuotes && ch in counts) counts[ch]++;
+    }
+    if (counts[','] >= counts[';'] && counts[','] >= counts['\t']) return ',';
+    return counts[';'] >= counts['\t'] ? ';' : '\t';
+}
+
+function tokenizeCsv(text, delimiter) {
+    // Returns [{ cells: string[], line: number }] — one entry per record.
+    const records = [];
+    let cells = [];
+    let cur = '';
+    let inQuotes = false;
+    let line = 1;        // physical line we are on
+    let recordLine = 1;  // physical line the current record started on
+    const endCell = () => { cells.push(cur.trim()); cur = ''; };
+    const endRecord = () => {
+        endCell();
+        records.push({ cells, line: recordLine });
+        cells = [];
+    };
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') inQuotes = false;
+            else {
+                if (ch === '\n') line++;
                 cur += ch;
             }
+        } else if (ch === '"') {
+            inQuotes = true;
+        } else if (ch === delimiter) {
+            endCell();
+        } else if (ch === '\r' || ch === '\n') {
+            if (ch === '\r' && text[i + 1] === '\n') i++; // \r\n counts as ONE line break
+            endRecord();
+            line++;
+            recordLine = line;
+        } else {
+            cur += ch;
         }
-        cells.push(cur);
-        return cells.map((c) => c.trim());
-    };
+    }
+    // last record when the file doesn't end with a line break
+    if (cur !== '' || cells.length > 0) endRecord();
+    return records;
+}
 
-    const firstLineCells = parseLine(lines[0]);
-    // A real header row's first cell should read "assetNumber" (case-insensitive).
-    // If it doesn't — e.g. the person deleted the header row before filling in
-    // data, or pasted straight from a sheet without one — line 1 is actually
-    // data, not a header. Fall back to the caller-supplied expected column
-    // order instead of eating that first row as a bogus header.
-    const looksLikeHeader = firstLineCells[0]?.trim().toLowerCase() === 'assetnumber';
+export function parseCsv(text, expectedHeaders = null) {
+    const clean = String(text ?? '').replace(/^\uFEFF/, '');
+    const delimiter = detectDelimiter(clean);
+    // Drop records whose cells are ALL empty (blank lines, ",,,,,", "   ").
+    const records = tokenizeCsv(clean, delimiter).filter((r) => r.cells.some((c) => c !== ''));
+    if (records.length === 0) return { headers: [], rows: [], rowLines: [] };
+
+    // Canonical column key for each normalized header spelling.
+    const canonical = new Map();
+    (expectedHeaders ?? []).forEach((h) => canonical.set(normHeader(h), h));
+    ['assetnumber', 'assetno', 'assetnum', 'assetid', 'asset'].forEach((alias) => {
+        if (!canonical.has(alias) && canonical.has('assetnumber')) canonical.set(alias, canonical.get('assetnumber'));
+    });
+    if (!canonical.has('assetnumber')) canonical.set('assetnumber', 'assetNumber');
+    ['eventtype', 'event', 'transactiontype', 'transaction'].forEach((alias) => {
+        if (!canonical.has(alias) && canonical.has('eventtype')) canonical.set(alias, canonical.get('eventtype'));
+    });
+
+    // A real header row has at least one cell that names a known column
+    // (assetNumber being the one every template starts with). If it
+    // doesn't — e.g. the header row was deleted, or the data was pasted
+    // straight from a sheet — line 1 is data, not a header.
+    const firstCells = records[0].cells;
+    const firstIsHeader = canonical.has(normHeader(firstCells[0]))
+        || firstCells.filter((c) => canonical.has(normHeader(c))).length >= 2;
 
     let headers;
-    let dataLines;
-    if (looksLikeHeader) {
-        headers = firstLineCells;
-        dataLines = lines.slice(1);
+    let dataRecords;
+    if (firstIsHeader) {
+        const seen = new Set();
+        headers = firstCells.map((c, i) => {
+            let key = canonical.get(normHeader(c)) ?? (String(c).trim() || `column${i + 1}`);
+            while (seen.has(key)) key = `${key}_${i + 1}`; // two columns, same name
+            seen.add(key);
+            return key;
+        });
+        dataRecords = records.slice(1);
     } else if (expectedHeaders) {
         headers = expectedHeaders;
-        dataLines = lines; // no header consumed — every line is data
+        dataRecords = records; // no header consumed — every record is data
     } else {
-        headers = firstLineCells;
-        dataLines = lines.slice(1);
+        headers = firstCells;
+        dataRecords = records.slice(1);
     }
 
-    const rows = dataLines.map((line) => {
-        const cells = parseLine(line);
+    const rows = dataRecords.map((r) => {
         const obj = {};
-        headers.forEach((h, i) => { obj[h] = cells[i] ?? ''; });
+        headers.forEach((h, i) => { obj[h] = r.cells[i] ?? ''; });
         return obj;
     });
-    return { headers, rows, headerWasMissing: !looksLikeHeader && !!expectedHeaders };
+    return {
+        headers,
+        rows,
+        rowLines: dataRecords.map((r) => r.line),
+        headerWasMissing: !firstIsHeader && !!expectedHeaders
+    };
 }
 
 // ======================================================

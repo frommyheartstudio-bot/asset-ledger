@@ -61,6 +61,10 @@ export function Select({ label, value, onChange, options, hint, placeholder }) {
 
 export function MultiSelect({ label, value, onChange, options, allLabel, hint }) {
     const [open, setOpen] = useState(false);
+    // `value === []` means "All" to the parent (no filter), so on its own it
+    // can't tell "everything" apart from "the person unticked everything".
+    // `none` remembers the second case so the boxes can really be cleared.
+    const [none, setNone] = useState(false);
     const rootRef = useRef(null);
     const allText = allLabel ?? `All ${label}`;
 
@@ -74,19 +78,42 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
         return () => document.removeEventListener('mousedown', onDocClick);
     }, [open]);
 
-    const allSelected = value.length === 0 || value.length === options.length;
-    const summary = allSelected
-        ? allText
-        : value.length === 1
-            ? value[0]
-            : `${value.length} selected`;
+    // If the parent puts something into `value` (or options reload), the
+    // "nothing ticked" state no longer applies.
+    useEffect(() => { if (value.length > 0) setNone(false); }, [value]);
 
-    const toggleAll = () => onChange(allSelected ? [] : []);
+    const allSelected = !none && (value.length === 0 || value.length === options.length);
+    const summary = none
+        ? 'None selected'
+        : allSelected
+            ? allText
+            : value.length === 1
+                ? value[0]
+                : `${value.length} selected`;
+
+    // "All" box: ticked -> untick everything; unticked -> tick everything.
+    const toggleAll = () => {
+        if (allSelected) {
+            setNone(true);
+            onChange([]);
+        } else {
+            setNone(false);
+            onChange([]);
+        }
+    };
     const toggleOption = (opt) => {
         // Expand the implicit "everything" state into an explicit list the
         // first time a single option is unchecked, then toggle normally.
-        const current = allSelected ? [...options] : value;
+        const current = none ? [] : (allSelected ? [...options] : value);
         const next = current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt];
+        if (next.length === 0) {
+            // Last box unticked: stay on "nothing ticked" instead of
+            // bouncing back to All.
+            setNone(true);
+            onChange([]);
+            return;
+        }
+        setNone(false);
         // Selecting every option is the same as selecting none — collapse
         // back to "All" so the summary label stays clean.
         onChange(next.length === options.length ? [] : next);
@@ -106,7 +133,7 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
             </label>
             <div className="multiselect-divider"/>
             {options.map((opt) => (<label className="multiselect-option" key={opt}>
-                <input type="checkbox" checked={allSelected || value.includes(opt)} onChange={() => toggleOption(opt)}/>
+                <input type="checkbox" checked={allSelected || (!none && value.includes(opt))} onChange={() => toggleOption(opt)}/>
                 <span>{opt}</span>
               </label>))}
           </div>)}

@@ -83,7 +83,12 @@
   background: var(--bg); border: 1px solid var(--border);
   padding: 7px 12px; border-radius: 20px; width: 280px; color: var(--text-muted);
 }
-.topbar .search input { border: none; background: transparent; outline: none; font-size: 13px; flex: 1; color: var(--text); }
+.topbar .search input { border: none; background: transparent; outline: none; font-size: 13px; flex: 1; min-width: 0; color: var(--text); }
+.topbar .search .search-clear {
+  border: none; background: transparent; cursor: pointer; padding: 0 2px;
+  font-size: 13px; line-height: 1; color: var(--text-muted); font-family: inherit;
+}
+.topbar .search .search-clear:hover { color: var(--text); }
 .topbar .icon-btn {
   width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--card); cursor: pointer; display: flex; align-items: center; justify-content: center;
