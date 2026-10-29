@@ -57,12 +57,14 @@ export function AssetRegister() {
     const METHOD_OPTIONS = useFormOptions().lists.registerMethodFilter ?? [];
     const assetClassNames = useAssetClasses();
     const [searchParams, setSearchParams] = useSearchParams();
-    // Empty array == "All" for each filter — MultiSelect lets the person
-    // tick any combination of Asset Class / Company / Status / Method.
-    const [assetClass, setAssetClass] = useState([]);
-    const [company, setCompany] = useState([]);
-    const [status, setStatus] = useState([]);
-    const [method, setMethod] = useState([]);
+    // null == "All" for each filter; an array is exactly the ticked options
+    // (an empty array really is "none ticked"). MultiSelect lets the person
+    // tick any combination of Asset Class / Company / Status / Method, and
+    // untick "All" to start from nothing.
+    const [assetClass, setAssetClass] = useState(null);
+    const [company, setCompany] = useState(null);
+    const [status, setStatus] = useState(null);
+    const [method, setMethod] = useState(null);
     const [selectedKeys, setSelectedKeys] = useState(() => new Set());
     // Which book's numbers (accum. depreciation, NBV, method) the table shows.
     // Federal Tax is what the register always showed.
@@ -85,14 +87,28 @@ export function AssetRegister() {
     useEffect(() => { setDraftQuery(query); }, [query]);
 
     // Dropdown filters actually in effect (copied from the draft on Search).
-    const [applied, setApplied] = useState({ assetClass: [], company: [], status: [], method: [] });
+    const [applied, setApplied] = useState({ assetClass: null, company: null, status: null, method: null });
     const handleSearch = () => {
         const q = draftQuery.trim();
         const next = {};
         if (q) next.q = q;
         if (excludeStatus) next.exclude = excludeStatus;
         setSearchParams(next, { replace: true });
-        setApplied({ assetClass: [...assetClass], company: [...company], status: [...status], method: [...method] });
+        setApplied({
+            assetClass: assetClass && [...assetClass],
+            company: company && [...company],
+            status: status && [...status],
+            method: method && [...method]
+        });
+    };
+
+    // X in the search box: forget the search text straight away (the other
+    // dropdown filters stay as they are until Search is clicked).
+    const handleClearSearch = () => {
+        setDraftQuery('');
+        const next = {};
+        if (excludeStatus) next.exclude = excludeStatus;
+        setSearchParams(next, { replace: true });
     };
 
     // Class/Company/Status/Method filtering happens client-side below so
@@ -102,10 +118,10 @@ export function AssetRegister() {
 
     const filteredItems = useMemo(() => {
         return items.filter((a) => (!excludeStatus || a.status !== excludeStatus)
-            && (applied.assetClass.length === 0 || applied.assetClass.includes(a.assetClass))
-            && (applied.company.length === 0 || applied.company.includes(a.company))
-            && (applied.status.length === 0 || applied.status.includes(a.status))
-            && (applied.method.length === 0 || applied.method.includes(a.method)));
+            && (applied.assetClass === null || applied.assetClass.includes(a.assetClass))
+            && (applied.company === null || applied.company.includes(a.company))
+            && (applied.status === null || applied.status.includes(a.status))
+            && (applied.method === null || applied.method.includes(a.method)));
     }, [items, applied, excludeStatus]);
 
     // Rows the chosen book has no rule for (they mirror Federal Tax) — drives the note above the table.
@@ -170,7 +186,7 @@ export function AssetRegister() {
 
       <div className="card card-pad mb-4">
         <div className="form-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: '0 16px' }}>
-          <Input label="Search" placeholder="Asset # or description…" value={draftQuery} onChange={(e) => setDraftQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}/>
+          <Input label="Search" placeholder="Asset # or description…" value={draftQuery} onChange={(e) => setDraftQuery(e.target.value)} onClear={handleClearSearch} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}/>
           <MultiSelect label="Asset Class" value={assetClass} onChange={setAssetClass} options={assetClassNames} allLabel="All Classes"/>
           <MultiSelect label="Company" value={company} onChange={setCompany} options={COMPANY_OPTIONS} allLabel="All Companies"/>
           <MultiSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} allLabel="All Statuses"/>
@@ -209,7 +225,7 @@ export function AssetRegister() {
 
           {loading && <Loader label="Loading assets…"/>}
 
-          {!loading && filteredItems.length === 0 && (<EmptyState title="No assets match these filters" description="Try widening the Asset Class or Company filter."/>)}
+          {!loading && filteredItems.length === 0 && (<EmptyState title="No assets match these filters" description="Try widening the filters, or tick All again."/>)}
 
           {!loading && filteredItems.length > 0 && (<div className="table-paged"><AssetTable assets={pageItems} onSelect={(a) => navigate(`/assets/${a.assetNumber}${book !== getDefaultBook() ? `?book=${encodeURIComponent(book)}` : ''}`)} selection={selection}/></div>)}
 

@@ -122,7 +122,14 @@ export const reportingRouter = Router();
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-reportingRouter.get('/catalog', async (_req, res) => res.json((await adminData()).reportCatalog));
+reportingRouter.get('/catalog', async (_req, res) => {
+  try {
+    res.json((await adminData()).reportCatalog);
+  } catch (err) {
+    console.error('[reporting] catalog failed:', err);
+    res.status(500).json({ error: 'Failed to load the report catalog' });
+  }
+});
 
 // ======================================================
 // END: GET /catalog
@@ -134,7 +141,14 @@ reportingRouter.get('/catalog', async (_req, res) => res.json((await adminData()
 // Output   : res (HTTP response, JSON)
 // ======================================================
 
-reportingRouter.get('/recent', async (_req, res) => res.json((await adminData()).generatedReports));
+reportingRouter.get('/recent', async (_req, res) => {
+  try {
+    res.json((await adminData()).generatedReports);
+  } catch (err) {
+    console.error('[reporting] recent failed:', err);
+    res.status(500).json({ error: 'Failed to load recent reports' });
+  }
+});
 
 // ======================================================
 // END: GET /recent
@@ -162,18 +176,26 @@ reportingRouter.post('/generate', async (req, res) => {
     res.status(400).json({ error: 'Focus period is required' });
     return;
   }
-  const created = await createGeneratedReport({
-    name: String(name).trim(),
-    book: book && String(book).trim() ? String(book).trim() : 'All Books',
-    period: String(period).trim(),
-    generatedBy: generatedBy && String(generatedBy).trim() ? String(generatedBy).trim() : 'System',
-    date: new Date().toISOString().slice(0, 10),
-    format: format && String(format).trim() ? String(format).trim() : 'CSV',
-    status: 'Ready',
-    csvContent: typeof csvContent === 'string' ? csvContent : ''
-  });
-  adminCache = null;
-  res.status(201).json(created);
+  // Express 4 ignores a rejected promise from an async handler, and Node then
+  // kills the whole server - the browser just sees "502 Bad Gateway". Catch it
+  // here so a failed save comes back as a normal error message instead.
+  try {
+    const created = await createGeneratedReport({
+      name: String(name).trim(),
+      book: book && String(book).trim() ? String(book).trim() : 'All Books',
+      period: String(period).trim(),
+      generatedBy: generatedBy && String(generatedBy).trim() ? String(generatedBy).trim() : 'System',
+      date: new Date().toISOString().slice(0, 10),
+      format: format && String(format).trim() ? String(format).trim() : 'CSV',
+      status: 'Ready',
+      csvContent: typeof csvContent === 'string' ? csvContent : ''
+    });
+    adminCache = null;
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('[reporting] generate failed:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to save the report run' });
+  }
 });
 
 // ======================================================

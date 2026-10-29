@@ -25,12 +25,22 @@ import { initFormOptions } from './services/formOptions.js';
 import { initAssetClassLabels } from './services/assetClassLabels.js';
 import { initRecoveryDefaults } from './services/recoveryDefaults.js';
 import { assertSeedData } from './services/bootChecks.js';
-import { pingPostgres } from './db/postgres.js';
+import { pingPostgres, pool } from './db/postgres.js';
 
 
 // ======================================================
 // START: index Functions
 // ======================================================
+
+// Safety net: one request that throws asynchronously must never take the whole
+// API down (that is what shows up in the browser as "502 Bad Gateway"). Log it
+// and keep serving.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -41,7 +51,10 @@ app.use(cors());
 // BEFORE the global express.json() so its larger body limit applies.
 app.use('/api/service', serviceRouter);
 
-app.use(express.json());
+// express.json() defaults to a 100 KB body limit - a Bulk Import / Master Data Set
+// CSV with a few hundred rows is bigger than that and was rejected with a 413
+// ("request entity too large") on the live server. 10 MB is plenty.
+app.use(express.json({ limit: '10mb' }));
 
 // Root URL - this server is the API only (the UI is the separate static site),
 // so answer with a small JSON message instead of "Cannot GET /".
@@ -86,6 +99,14 @@ async function start(): Promise<void> {
       '         npm run db:schema:apply\n'
     );
     process.exit(1);
+  }
+
+  // Self-heal an older database: add the report "csvContent" column if it is missing
+  // (otherwise saving a generated report crashes with 'column does not exist').
+  try {
+    await pool.query(`ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS "csvContent" TEXT NOT NULL DEFAULT ''`);
+  } catch (err) {
+    console.error('[boot] could not ensure generated_reports.csvContent:', err instanceof Error ? err.message : err);
   }
 
   const rateTableCount = await initRateTables();

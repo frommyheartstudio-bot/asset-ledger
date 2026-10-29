@@ -15,11 +15,16 @@ import { useEffect, useRef, useState } from 'react';
 // Purpose  : React component that renders the 'Input' UI
 // ======================================================
 
-export function Input({ label, hint, id, ...rest }) {
+export function Input({ label, hint, id, onClear, ...rest }) {
     const inputId = id ?? `input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+    // Pass onClear to get a small X inside the box (shown only while it has text).
+    const showClear = typeof onClear === 'function' && String(rest.value ?? '') !== '';
     return (<div className="form-row">
       <label htmlFor={inputId}>{label}</label>
-      <input id={inputId} {...rest}/>
+      {onClear ? (<div style={{ position: 'relative' }}>
+          <input id={inputId} {...rest} style={{ ...(rest.style ?? {}), paddingRight: 30 }}/>
+          {showClear && (<button type="button" title="Clear" aria-label={`Clear ${label}`} onClick={onClear} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, lineHeight: 1, color: 'var(--text-muted, #64748b)' }}>✕</button>)}
+        </div>) : (<input id={inputId} {...rest}/>)}
       {hint && <div className="hint">{hint}</div>}
     </div>);
 }
@@ -51,8 +56,15 @@ export function Select({ label, value, onChange, options, hint, placeholder }) {
 /**
  * Labeled multi-select matching the same .form-row styling as Select, but
  * lets the person tick several options (plus a top "All …" checkbox that
- * selects/clears every option at once). `value` is an array of the
- * currently-checked options; an empty array is treated as "All".
+ * ticks / unticks every option at once).
+ *
+ * `value` is either
+ *   - null / undefined  -> "All" (nothing narrowed; every box ticked), or
+ *   - an array          -> exactly the ticked options. [] really means NONE.
+ * `onChange` receives null when everything is ticked again, otherwise the array.
+ *
+ * (Before, "empty array" meant "All", so unticking "All" just produced [] again
+ * and the box could never be cleared.)
  */
 // ======================================================
 // Function : MultiSelect
@@ -74,22 +86,23 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
         return () => document.removeEventListener('mousedown', onDocClick);
     }, [open]);
 
-    const allSelected = value.length === 0 || value.length === options.length;
+    const list = Array.isArray(value) ? value : null;           // null => everything
+    const ticked = list ?? options;
+    const allSelected = list === null || (options.length > 0 && options.every((o) => list.includes(o)));
     const summary = allSelected
         ? allText
-        : value.length === 1
-            ? value[0]
-            : `${value.length} selected`;
+        : ticked.length === 0
+            ? 'None selected'
+            : ticked.length === 1
+                ? ticked[0]
+                : `${ticked.length} selected`;
 
-    const toggleAll = () => onChange(allSelected ? [] : []);
+    // Ticking "All" selects everything; unticking it clears everything.
+    const toggleAll = () => onChange(allSelected ? [] : null);
     const toggleOption = (opt) => {
-        // Expand the implicit "everything" state into an explicit list the
-        // first time a single option is unchecked, then toggle normally.
-        const current = allSelected ? [...options] : value;
-        const next = current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt];
-        // Selecting every option is the same as selecting none — collapse
-        // back to "All" so the summary label stays clean.
-        onChange(next.length === options.length ? [] : next);
+        const next = ticked.includes(opt) ? ticked.filter((o) => o !== opt) : [...ticked, opt];
+        // Everything ticked again is the same as "All".
+        onChange(options.length > 0 && options.every((o) => next.includes(o)) ? null : next);
     };
 
     return (<div className="form-row" ref={rootRef}>
@@ -106,7 +119,7 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
             </label>
             <div className="multiselect-divider"/>
             {options.map((opt) => (<label className="multiselect-option" key={opt}>
-                <input type="checkbox" checked={allSelected || value.includes(opt)} onChange={() => toggleOption(opt)}/>
+                <input type="checkbox" checked={ticked.includes(opt)} onChange={() => toggleOption(opt)}/>
                 <span>{opt}</span>
               </label>))}
           </div>)}

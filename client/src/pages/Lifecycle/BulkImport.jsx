@@ -54,8 +54,7 @@ const EVENT_TYPES = [
 
 export function BulkImport() {
     useFormOptions();
-    const { user, hasEdit } = useAuth();
-    const canImport = hasEdit('bulk-import');
+    const { user } = useAuth();
     return (<AppLayout active="bulk-import" title="Bulk Import" crumb="Home / Lifecycle Events / Bulk Import">
       <div className="page-header">
         <div>
@@ -99,6 +98,11 @@ function findDuplicateAssetNumbers(rows) {
 // ======================================================
 
 function EventImportCard({ evt, user }) {
+    // Each card works out its own permission - this used to be a variable of the
+    // parent page only, so rendering the Import button threw a ReferenceError
+    // (and, with no error boundary, blanked the whole page) once a CSV was loaded.
+    const { hasEdit } = useAuth();
+    const canImport = hasEdit('bulk-import');
     const schema = FIELD_SCHEMAS[evt.id] ?? [];
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState([]); // parsed CSV rows (raw, header-keyed)
@@ -106,6 +110,7 @@ function EventImportCard({ evt, user }) {
     const [dropdownWarnings, setDropdownWarnings] = useState([]);
     const [importing, setImporting] = useState(false);
     const [results, setResults] = useState(null); // { posted, failed, items }
+    const [inputKey, setInputKey] = useState(0);
 
     function downloadTemplate() {
         downloadCsv(`${evt.id}-template.csv`, buildTemplateCsv(schema));
@@ -150,9 +155,11 @@ function EventImportCard({ evt, user }) {
         try {
             const lifecycleRows = rowsToLifecycleRows(rows, schema);
             const res = await lifecycleApi.bulkImport({ eventType: evt.label, rows: lifecycleRows, postedBy: user?.name });
-            const posted = res.results.filter((r) => r.status === 'posted').length;
-            const failed = res.results.length - posted;
-            setResults({ posted, failed, items: res.results });
+            const items = Array.isArray(res?.results) ? res.results : [];
+            if (items.length === 0) throw new Error('The server returned no results for this import.');
+            const posted = items.filter((r) => r.status === 'posted').length;
+            const failed = items.length - posted;
+            setResults({ posted, failed, items });
         } catch (err) {
             setParseError(err.message || 'Bulk import failed.');
         } finally {
@@ -166,6 +173,7 @@ function EventImportCard({ evt, user }) {
         setParseError('');
         setDropdownWarnings([]);
         setResults(null);
+        setInputKey((k) => k + 1);
     }
 
     return (<div className="card card-pad">
@@ -187,7 +195,7 @@ function EventImportCard({ evt, user }) {
 
       <div className="form-row">
         <label htmlFor={`file-${evt.id}`}>Upload filled-in CSV</label>
-        <input id={`file-${evt.id}`} type="file" accept=".csv,text/csv" onChange={onFileChange}/>
+        <input key={inputKey} id={`file-${evt.id}`} type="file" accept=".csv,text/csv" onChange={onFileChange}/>
         {fileName && <div className="hint">{fileName}</div>}
       </div>
 
@@ -246,6 +254,8 @@ function EventImportCard({ evt, user }) {
 // ======================================================
 
 function MasterDataSetImportCard({ user }) {
+    const { hasEdit } = useAuth();
+    const canImport = hasEdit('bulk-import');
     const [fileName, setFileName] = useState('');
     const [rows, setRows] = useState([]); // filled rows, each tagged with its CSV line number
     const [parseError, setParseError] = useState('');
@@ -256,6 +266,7 @@ function MasterDataSetImportCard({ user }) {
     const [results, setResults] = useState(null); // { posted, failed, items }
     const previewPg = usePagination(rows);
     const resultsPg = usePagination(results?.items ?? []);
+    const [inputKey, setInputKey] = useState(0);
 
     function downloadTemplate() {
         downloadCsv('master-data-set-template.csv', buildUnifiedTemplateCsv());
@@ -269,6 +280,7 @@ function MasterDataSetImportCard({ user }) {
         setDupAdditions([]);
         setDropdownWarnings([]);
         setResults(null);
+        setInputKey((k) => k + 1);
     }
 
     function onFileChange(e) {
@@ -326,7 +338,9 @@ function MasterDataSetImportCard({ user }) {
         try {
             const res = await lifecycleApi.bulkPost({ rows: rowsToBulkPostRows(rows), postedBy: user?.name });
             // The server returns outcomes in the same order as the rows sent.
-            const items = res.results.map((r, i) => ({ ...r, line: rows[i]?.__line }));
+            const serverItems = Array.isArray(res?.results) ? res.results : [];
+            if (serverItems.length === 0) throw new Error('The server returned no results for this import.');
+            const items = serverItems.map((r, i) => ({ ...r, line: rows[i]?.__line }));
             const posted = items.filter((r) => r.status === 'posted').length;
             setResults({ posted, failed: items.length - posted, items });
         } catch (err) {
@@ -360,7 +374,7 @@ function MasterDataSetImportCard({ user }) {
 
       <div className="form-row">
         <label htmlFor="file-master-data-set">Upload filled-in CSV</label>
-        <input id="file-master-data-set" type="file" accept=".csv,text/csv" onChange={onFileChange}/>
+        <input key={inputKey} id="file-master-data-set" type="file" accept=".csv,text/csv" onChange={onFileChange}/>
         {fileName && <div className="hint">{fileName}</div>}
       </div>
 

@@ -4,7 +4,7 @@
 // ======================================================
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../api/auth.api';
 
@@ -20,7 +20,15 @@ import { authApi } from '../api/auth.api';
 export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) {
     const { user, logout, hasView } = useAuth();
     const navigate = useNavigate();
-    const [query, setQuery] = useState('');
+    const location = useLocation();
+    // Every page renders its own <AppLayout>/<Header>, so this component is
+    // re-created on each navigation and a plain useState('') lost the text the
+    // moment the search jumped to /assets?q=... The applied search therefore
+    // lives in the URL: the box starts from ?q= and re-syncs when it changes,
+    // so the text stays put until the person clears it (X) or deletes it.
+    const urlQuery = location.pathname === '/assets' ? (new URLSearchParams(location.search).get('q') ?? '') : '';
+    const [query, setQuery] = useState(urlQuery);
+    useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
     const [menuIsOpen, setMenuIsOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -100,8 +108,18 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
     // by asset number / description. Filters are applied server-side.
     const runSearch = () => {
         const q = query.trim();
-        if (!q) return;
+        if (!q) {
+            // Empty box + Enter while looking at search results = clear the search.
+            if (urlQuery) navigate('/assets');
+            return;
+        }
         navigate(`/assets?q=${encodeURIComponent(q)}`);
+    };
+
+    // X button: wipe the text and, if a search is applied, drop it from the URL too.
+    const clearSearch = () => {
+        setQuery('');
+        if (urlQuery) navigate('/assets');
     };
 
     const handleLogout = () => {
@@ -127,6 +145,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSearch()}
         />
+        {query && (<button type="button" className="search-clear" title="Clear search" aria-label="Clear search" onClick={clearSearch}>✕</button>)}
       </div>
       <div className={`icon-btn notif-btn ${canSeeLogins ? '' : 'notif-btn-static'}`} title="Notifications" ref={notifRef} onClick={canSeeLogins ? toggleNotifications : undefined} style={{ position: 'relative', cursor: canSeeLogins ? 'pointer' : 'default' }}>
         ◔{unseenLogins.length > 0 && <span className="badge-dot"/>}

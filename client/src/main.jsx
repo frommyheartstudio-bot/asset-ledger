@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BootDataGate } from './context/BootDataGate';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import App from './App';
 import './styles.css';
 
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')).render(<StrictMode>
     <BrowserRouter>
       <BootDataGate>
         <AuthProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </AuthProvider>
       </BootDataGate>
     </BrowserRouter>

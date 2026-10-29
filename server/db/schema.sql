@@ -120,6 +120,10 @@ CREATE TABLE IF NOT EXISTS generated_reports
     status         TEXT NOT NULL,   -- Ready | Draft | Processing
     "csvContent"   TEXT NOT NULL DEFAULT ''   -- the actual CSV text, so "Recently Generated Reports" can be re-downloaded later
 );
+-- Databases created before the CSV was stored have this table WITHOUT "csvContent"
+-- (CREATE TABLE IF NOT EXISTS never adds a column to an existing table), which made
+-- every report save fail. Safe to run repeatedly.
+ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS "csvContent" TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_generated_reports_date ON generated_reports ("reportDate", name);
 
 -- ---------- data/assetClasses.ts : ASSET_CLASS_SEED (Configuration -> Asset Classes page) ----------

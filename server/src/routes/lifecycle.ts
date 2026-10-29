@@ -312,12 +312,19 @@ lifecycleRouter.post('/bulk-import', async (req, res) => {
     return;
   }
 
-  const results = await runBulkImport(
-    body.eventType as LifecyclePreviewInput['eventType'],
-    body.rows,
-    body.postedBy?.trim() || 'system'
-  );
-  res.json({ results });
+  // Express 4 does not catch a rejected promise from an async handler - without
+  // this try/catch an unexpected failure would leave the request hanging.
+  try {
+    const results = await runBulkImport(
+      body.eventType as LifecyclePreviewInput['eventType'],
+      body.rows,
+      body.postedBy?.trim() || 'system'
+    );
+    res.json({ results });
+  } catch (err) {
+    console.error('Bulk import failed:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Bulk import failed' });
+  }
 });
 
 export type BulkPostRow = { eventType?: string; assetNumber?: string; fields?: Record<string, unknown> };
@@ -406,8 +413,13 @@ lifecycleRouter.post('/bulk-post', async (req, res) => {
     return;
   }
 
-  const results = await runBulkPost(body.rows, body.postedBy?.trim() || 'system');
-  res.json({ results });
+  try {
+    const results = await runBulkPost(body.rows, body.postedBy?.trim() || 'system');
+    res.json({ results });
+  } catch (err) {
+    console.error('Bulk post failed:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Bulk post failed' });
+  }
 });
 
 // Row shape shared by both /transactions endpoints below.
