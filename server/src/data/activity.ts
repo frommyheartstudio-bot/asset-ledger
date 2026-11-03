@@ -323,7 +323,7 @@ export function computeAssetMonthlyDepreciationForYear(asset: Asset, year: numbe
         bonus = split.afyd;
         const backdated = split.bookedYear * 12 + split.bookedMonth > ctx.pisdYear * 12 + ctx.pisdMonth;
         revisionAbsorbed = backdated ? round2(split.afyd + split.missedRegular) : 0;
-        cyRevisionAbsorbed = backdated ? round2(split.afyd + split.cyRegular) : 0;
+        cyRevisionAbsorbed = backdated ? round2(split.cyBonus + split.cyRegular) : 0;
         pyRevisionAbsorbed = backdated ? split.pyRegular : 0;
       }
     }

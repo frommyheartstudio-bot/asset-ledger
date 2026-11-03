@@ -287,6 +287,7 @@ export function AssetDetail() {
                     <th className="num" title="Bonus depreciation (AFYD) = Cost x Bonus %">Bonus</th>
                     <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }} title="Current-year catch-up = missed bonus (AFYD) + missed regular depreciation inside the booked year (Jan .. month before booking)">Revision Absorbed<br/>(Current Yr)</th>
                     <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }} title="Prior-year catch-up = missed regular depreciation from placed-in-service through Dec 31 of the year before the booked year">Revision Absorbed<br/>(Prior Yr)</th>
+                    <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }} title="Prior-year bonus catch-up = bonus (Cost x Bonus %) of an asset placed in service in an earlier year but booked this year">Bonus Revision<br/>(Prior Yr)</th>
                     <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Depreciation</th>
                     <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Accum. Depr</th>
                     <th className="num" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', lineHeight: 1.25 }}>Closing NBV</th>
@@ -304,12 +305,13 @@ export function AssetDetail() {
                         <td className="num" data-label="Bonus">{formatCurrency(row.bonus ?? 0, { compact: true })}</td>
                         <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(row.cyRevisionAbsorbed ?? row.revisionAbsorbed ?? 0, { compact: true })}</td>
                         <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(row.pyRevisionAbsorbed ?? 0, { compact: true })}</td>
+                        <td className="num" data-label="Bonus Revision (PY)">{formatCurrency(row.pyBonusRevisionAbsorbed ?? 0, { compact: true })}</td>
                         <td className="num" data-label="Depreciation">{formatCurrency(row.depreciation, { compact: true })}</td>
                         <td className="num" data-label="Accum. Depr">{formatCurrency(row.accumDepreciation, { compact: true })}</td>
                         <td className="num" data-label="Closing NBV">{formatCurrency(row.closingNbv, { compact: true })}</td>
                       </tr>
                       {isOpen && (<tr>
-                          <td colSpan={9} style={{ background: 'var(--surface-2, #f8fafc)', padding: 0 }}>
+                          <td colSpan={10} style={{ background: 'var(--surface-2, #f8fafc)', padding: 0 }}>
                             <div style={{ padding: 0 }}>
                               {monthlyLoading && !monthlyByYear[year] ? (<Loader label="Loading months…"/>) : monthlyError ? (
                                 <ErrorMessage message={monthlyError} onRetry={() => toggleYear(row)}/>
@@ -347,6 +349,7 @@ export function AssetDetail() {
                                               <td className="num" data-label="Bonus">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(0, { compact: true })}</td>
+                                              <td className="num" data-label="Bonus Revision (PY)">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Depreciation">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Accum. Depr">{formatCurrency(0, { compact: true })}</td>
                                               <td className="num" data-label="Closing NBV">{formatCurrency(0, { compact: true })}</td>
@@ -363,6 +366,7 @@ export function AssetDetail() {
                                             <td className="num" data-label="Bonus">{formatCurrency(m.bonus ?? 0, { compact: true })}</td>
                                             <td className="num" data-label="Revision Absorbed (CY)">{formatCurrency(m.cyRevisionAbsorbed ?? m.revisionAbsorbed ?? 0, { compact: true })}</td>
                                             <td className="num" data-label="Revision Absorbed (PY)">{formatCurrency(m.pyRevisionAbsorbed ?? 0, { compact: true })}</td>
+                                            <td className="num" data-label="Bonus Revision (PY)">{formatCurrency(m.pyBonusRevisionAbsorbed ?? 0, { compact: true })}</td>
                                             <td className="num" data-label="Depreciation">{formatCurrency(m.value, { compact: true })}</td>
                                             <td className="num" data-label="Accum. Depr">{formatCurrency(runningAccum, { compact: true })}</td>
                                             <td className="num" data-label="Closing NBV">{formatCurrency(closing, { compact: true })}</td>

@@ -79,6 +79,23 @@ describe('Addition: hand-calculated', () => {
   });
 });
 
+// ---------------- 2b. Same numbers as the Additions HTML calculator ----------------
+describe('Addition: same behaviour as the HTML calculator', () => {
+  const run = (o: any) => require('../calc-engine/additions.cjs').calculateAddition({ ...o, assetConfig });
+  it('A1: HY 5-yr ADS, PIS Feb-26 booked Feb-26 -> fed_reg_depr_exp = year-1 amount / 12 (135.63)', () => {
+    const r = run({ cost: 16275.56, pisd: '2026-02-16', accountingPeriodDate: '2026-02-28', lifeMonths: 60, bonusPercent: 0, convention: 'HY', quarter: 1, assetType: 'ADS-5' });
+    expect(r.steps.step6b.fedRegDeprExp).toBeCloseTo(135.63, 2);
+  });
+  it('A5: 100% bonus, PIS Oct-25 booked Mar-26 -> one bonus_revision_absorbed = 924', () => {
+    const r = run({ cost: 924, pisd: '2025-10-27', accountingPeriodDate: '2026-03-31', lifeMonths: 60, bonusPercent: 100, convention: 'HY', quarter: 4, assetType: 'GDS-5' });
+    expect(r.steps.step6.bonusRevisionAbsorbed).toBeCloseTo(924, 2);
+  });
+  it('A3: same-year backdated 20% bonus -> bonus_revision_absorbed 24,000', () => {
+    const r = run({ cost: 120000, pisd: '2026-01-10', accountingPeriodDate: '2026-04-30', lifeMonths: 60, bonusPercent: 20, convention: 'HY', quarter: 1, assetType: 'GDS-5' });
+    expect(r.steps.step6.bonusRevisionAbsorbed).toBeCloseTo(24000, 2);
+  });
+});
+
 // ---------------- 3. All stored engine cases (162 in engine-test-cases.sql) ----------------
 const cases = sqlRows('engine-test-cases.sql', 'engine_test_cases').map(([engine, caseId, name, inputs, expected]) => ({
   engine: String(engine), caseId: String(caseId), name: String(name),

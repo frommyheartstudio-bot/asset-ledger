@@ -230,7 +230,7 @@ export function bookedContext(asset: Asset): { bookedYear: number; bookedMonth: 
 export function bookedYearSplit(
   asset: Asset,
   rowDepreciation: number
-): { bookedYear: number; bookedMonth: number; catchUp: number; monthly: number; afyd: number; missedRegular: number; pyRegular: number; cyRegular: number } | null {
+): { bookedYear: number; bookedMonth: number; catchUp: number; monthly: number; afyd: number; missedRegular: number; pyRegular: number; cyRegular: number; cyBonus: number } | null {
   const ctx = bookedContext(asset);
   if (!ctx) return null;
   const cost = Number(asset.cost) || 0;
@@ -282,10 +282,14 @@ export function bookedYearSplit(
   }
   const cyRegular = missedRegular - pyRegular;
 
+  // Bonus catch-up (same as the Additions HTML calculator): one number, added to the current-year revision.
+  const backdatedBooking = ctx.bookedYear * 12 + ctx.bookedMonth > ctx.pisdYear * 12 + ctx.pisdMonth;
+  const cyBonus = backdatedBooking ? afyd : 0;
+
   const catchUp = Math.min(round2(afyd + missedRegular), rowDepreciation);
   const monthsLeft = 13 - ctx.bookedMonth; // booked month .. December
   const monthly = Math.max(0, round2((rowDepreciation - catchUp) / monthsLeft));
-  return { bookedYear: ctx.bookedYear, bookedMonth: ctx.bookedMonth, catchUp, monthly, afyd: round2(afyd), missedRegular: round2(missedRegular), pyRegular: round2(pyRegular), cyRegular: round2(cyRegular) };
+  return { bookedYear: ctx.bookedYear, bookedMonth: ctx.bookedMonth, catchUp, monthly, afyd: round2(afyd), missedRegular: round2(missedRegular), pyRegular: round2(pyRegular), cyRegular: round2(cyRegular), cyBonus: round2(cyBonus) };
 }
 
 // ======================================================
@@ -293,6 +297,7 @@ export function bookedYearSplit(
 // Purpose  : Adds the two columns the Depreciation Schedule shows, using the same numbers
 //            as the Additions calculator:
 //              bonus            = Step 4  AFYD = Cost x Bonus%   (in the year it is recognised)
+//              cyRevisionAbsorbed = regular (this year) + same-year bonus; pyRevisionAbsorbed = regular (prior years);
 //              revisionAbsorbed = Step 6  missed regular (PISD .. month before booking)
 //                                         + missed bonus; only for a backdated Addition,
 //                                         in the booked year (that is where it is posted).
@@ -315,7 +320,7 @@ export function withBonusAndRevision(asset: Asset, rows: DepreciationScheduleRow
         ...r,
         bonus: split.afyd,
         // Current-year revision = missed bonus + missed regular inside the booked year; prior-year = regular through prior Dec 31.
-        cyRevisionAbsorbed: backdated ? round2(split.afyd + split.cyRegular) : 0,
+        cyRevisionAbsorbed: backdated ? round2(split.cyBonus + split.cyRegular) : 0,
         pyRevisionAbsorbed: backdated ? split.pyRegular : 0,
         revisionAbsorbed: backdated ? round2(split.afyd + split.missedRegular) : 0
       };
