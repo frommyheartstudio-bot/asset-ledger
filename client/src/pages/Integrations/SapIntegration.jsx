@@ -145,16 +145,16 @@ export function SapIntegration() {
                 <tbody>
                   {records.map((r) => (<tr key={r.documentId}>
                       <td><input type="checkbox" disabled={r.status !== 'new'} checked={selected.has(r.documentId)} onChange={() => toggle(r.documentId)} aria-label={`Select ${r.assetNumber}`}/></td>
-                      <td className="mono">{r.documentId}</td>
-                      <td className="mono">{r.assetNumber}</td>
-                      <td>{r.companyCode}</td>
-                      <td>{r.assetClass}</td>
-                      <td>{r.description}</td>
-                      <td className="text-right">{money(r.acquisitionCost)}</td>
-                      <td>{r.capitalizationDate}</td>
-                      <td>
+                      <td className="mono" data-label="SAP Doc">{r.documentId}</td>
+                      <td className="mono" data-label="Asset #">{r.assetNumber}</td>
+                      <td data-label="Company">{r.companyCode}</td>
+                      <td data-label="Asset Class">{r.assetClass}</td>
+                      <td data-label="Description">{r.description}</td>
+                      <td className="text-right" data-label="Cost">{money(r.acquisitionCost)}</td>
+                      <td data-label="Capitalized">{r.capitalizationDate}</td>
+                      <td className="status-cell" data-label="Status">
                         <Pill tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Pill>
-                        {r.error && <div className="text-sm text-muted">{r.error}</div>}
+                        {r.error && <div className="status-msg text-sm text-muted">{r.error}</div>}
                       </td>
                     </tr>))}
                 </tbody>
