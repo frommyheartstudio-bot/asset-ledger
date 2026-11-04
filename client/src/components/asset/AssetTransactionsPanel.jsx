@@ -14,6 +14,7 @@ import { lifecycleApi } from '../../api/lifecycle.api';
 import { Loader } from '../common/Loader';
 import { ErrorMessage } from '../common/ErrorMessage';
 import { LifecycleTransactionsTable } from './LifecycleTransactionsTable';
+import { withDefaultCreationEntry } from '../../utils/defaultAssetEntry';
 
 // ======================================================
 // START: Component Functions
@@ -24,7 +25,7 @@ import { LifecycleTransactionsTable } from './LifecycleTransactionsTable';
 // Purpose  : React component that renders the 'AssetTransactionsPanel' UI
 // ======================================================
 
-export function AssetTransactionsPanel({ assetNumber }) {
+export function AssetTransactionsPanel({ assetNumber, asset }) {
     const [items, setItems] = useState(null);
     const [error, setError] = useState(null);
 
@@ -57,7 +58,7 @@ export function AssetTransactionsPanel({ assetNumber }) {
     }
 
     return (<LifecycleTransactionsTable
-      items={items}
+      items={withDefaultCreationEntry(items, asset)}
       showAssetColumn={false}
       emptyTitle="No transactions posted yet"
       emptyDescription="Events posted for this asset from the Lifecycle page will show up here, pulled from the Postgres ledger."

@@ -17,6 +17,7 @@ import { ErrorMessage } from '../common/ErrorMessage';
 import { EmptyState } from '../common/EmptyState';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDateTime } from '../../utils/formatDate';
+import { withDefaultCreationEntry } from '../../utils/defaultAssetEntry';
 
 // ======================================================
 // Function : toNumber
@@ -83,7 +84,7 @@ const RESULT_ROW_LABELS = ['Ending Accum. Depreciation', 'Ending Net Book Value'
 // Purpose  : React component that renders the 'AuditTrailPanel' UI
 // ======================================================
 
-export function AuditTrailPanel({ assetNumber }) {
+export function AuditTrailPanel({ assetNumber, asset }) {
     const [items, setItems] = useState(null);
     const [error, setError] = useState(null);
 
@@ -107,7 +108,8 @@ export function AuditTrailPanel({ assetNumber }) {
     if (!items) {
         return <Loader label="Loading audit trail…" />;
     }
-    if (items.length === 0) {
+    const shown = withDefaultCreationEntry(items, asset);
+    if (shown.length === 0) {
         return (<EmptyState
         title="No changes recorded yet"
         description="Every lifecycle event posted for this asset (who posted it, when, and what changed) will show up here."
@@ -115,7 +117,22 @@ export function AuditTrailPanel({ assetNumber }) {
     }
 
     return (<div className="timeline">
-      {items.map((tx) => {
+      {shown.map((tx) => {
+          if (tx.isDefault) {
+              const costRow = tx.preview.rows.find((r) => r.label === 'Cost');
+              return (<div className="tl-item done" key={tx.transactionId}>
+                  <div className="tl-date">At creation</div>
+                  <div className="tl-title">
+                    Asset <strong>created by default</strong>{' '}
+                    <Pill tone={tx.preview.badgeTone}>{tx.postedBy}</Pill>
+                  </div>
+                  <div className="tl-desc">
+                    {[costRow && `Cost: ${costRow.value}`, ...tx.preview.rows.filter((r) => r.label === 'Placed In Service').map((r) => `${r.label}: ${r.value}`)].filter(Boolean).join(' · ')}
+                    <br />
+                    <span className="text-muted">Loaded with the system, not posted through a lifecycle event.</span>
+                  </div>
+                </div>);
+          }
           const headline = getHeadlineAmount(tx);
           const changedFields = Object.keys(tx.fields ?? {}).filter((k) => tx.fields[k] !== '' && tx.fields[k] != null);
           return (<div className="tl-item done" key={tx.transactionId}>

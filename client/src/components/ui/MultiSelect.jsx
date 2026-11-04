@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
+import { MAX_VISIBLE_OPTIONS } from './SearchSelect';
 
 // ======================================================
 // START: Component Functions
@@ -23,11 +24,16 @@ import { Icon } from './Icon';
 
 export function MultiSelect({ label, options, selected, onChange, allLabel = 'All' }) {
     const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
     const wrapRef = useRef(null);
+    const searchable = options.length > MAX_VISIBLE_OPTIONS;
+    const shown = query.trim()
+        ? options.filter((o) => String(o.label).toLowerCase().includes(query.trim().toLowerCase()))
+        : options;
 
     useEffect(() => {
         function onDocMouseDown(e) {
-            if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setQuery(''); }
         }
         document.addEventListener('mousedown', onDocMouseDown);
         return () => document.removeEventListener('mousedown', onDocMouseDown);
@@ -60,16 +66,23 @@ export function MultiSelect({ label, options, selected, onChange, allLabel = 'Al
       </button>
       {open && (<div className="card" style={{
             position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-            zIndex: 30, maxHeight: 220, overflowY: 'auto', boxShadow: 'var(--shadow-lg)', padding: '4px 0'
+            zIndex: 30, boxShadow: 'var(--shadow-lg)', padding: '4px 0'
         }}>
+          {searchable && (<div className="multiselect-search">
+              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${options.length} options…`} aria-label="Search options" autoComplete="off"/>
+            </div>)}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
             <input type="checkbox" checked={allSelected} onChange={toggleAll}/>
             Select All
           </label>
-          {options.map((o) => (<label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggleOne(o.value)}/>
-              {o.label}
-            </label>))}
+          {/* shows 10 rows, the rest scrolls */}
+          <div className="multiselect-list">
+            {shown.map((o) => (<label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggleOne(o.value)}/>
+                {o.label}
+              </label>))}
+            {shown.length === 0 && <div className="ss-empty">No matches</div>}
+          </div>
         </div>)}
     </div>);
 }

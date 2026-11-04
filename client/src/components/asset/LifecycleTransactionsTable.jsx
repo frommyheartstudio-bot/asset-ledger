@@ -64,7 +64,7 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
                       </Link>
                     </td>)}
                   <td>{tx.eventType}</td>
-                  <td>{formatDateTime(tx.postedAt)}</td>
+                  <td>{tx.isDefault ? 'At creation' : formatDateTime(tx.postedAt)}</td>
                   <td>{tx.postedBy}</td>
                   <td>
                     <Pill tone={tx.preview.badgeTone}>{tx.preview.badgeText}</Pill>
@@ -102,12 +102,12 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
                             </table>
                           </div>))}
 
-                        <details style={{ marginTop: 8 }}>
+                        {!tx.isDefault && (<details style={{ marginTop: 8 }}>
                           <summary className="text-sm text-muted" style={{ cursor: 'pointer' }}>
                             Raw submitted fields
                           </summary>
                           <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{JSON.stringify(tx.fields, null, 2)}</pre>
-                        </details>
+                        </details>)}
                       </div>
                     </td>
                   </tr>)}

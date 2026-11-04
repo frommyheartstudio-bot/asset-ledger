@@ -412,3 +412,41 @@ export function findUnmatchedSelectValuesUnified(csvRows) {
 // ======================================================
 // END OF FILE : csv.js
 // ======================================================
+
+// ======================================================
+// Function : buildForecastCsv
+// Purpose  : CSV for Planning -> Forecasting: scope, KPIs, the yearly
+//            depreciation forecast and the capital roll-forward, with
+//            full (un-abbreviated) dollar amounts.
+// ======================================================
+
+export function buildForecastCsv(data, { book, years, scope }) {
+    const cell = (v) => {
+        const t = v == null ? '' : String(v);
+        return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const money = (n) => (Number.isFinite(Number(n)) ? (Math.round(Number(n) * 100) / 100).toFixed(2) : '');
+    const line = (arr) => arr.map(cell).join(',');
+    const k = data.kpis ?? {};
+    const out = [
+        line(['Depreciation Forecast']),
+        line(['Book', book]),
+        line(['Horizon', `Next ${years} year${years > 1 ? 's' : ''}`]),
+        line(['Scope', scope]),
+        '',
+        line(['Key figures']),
+        line(['Projected depreciation (next FY)', money(k.projectedDepreciationNextFY)]),
+        line(['Planned CapEx', money(k.plannedCapEx)]),
+        line(['Assets fully depreciating next FY', k.assetsFullyDepreciatingNextFY]),
+        line(['Projected ending NBV', money(k.projectedEndingNbv)]),
+        '',
+        line(['Depreciation expense forecast']),
+        line(['Year', 'Depreciation Expense']),
+        ...(data.expenseByYear ?? []).map((e) => line([e.year, money(e.millions * 1e6)])),
+        '',
+        line(['Capital roll-forward']),
+        line(['Year', 'Opening NBV', 'Additions', 'Depreciation', 'Retirements', 'Closing NBV']),
+        ...(data.rollForward ?? []).map((r) => line([r.year, money(r.openingNbv), money(r.additions), money(-Math.abs(r.depreciation)), money(-Math.abs(r.retirements)), money(r.closingNbv)]))
+    ];
+    return out.join('\n') + '\n';
+}

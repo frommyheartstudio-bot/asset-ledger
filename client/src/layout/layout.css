@@ -152,8 +152,11 @@
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 21;
-    height: 58px;
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    /* box-sizing is border-box, so the safe-area padding must be ADDED to the
+       58px — otherwise on phones with a home bar the icons/labels get squeezed
+       and the bar looks overlapped. */
+    height: calc(58px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--card);
     border-top: 1px solid var(--border);
     box-shadow: 0 -2px 10px rgba(15, 37, 64, .06);
@@ -191,6 +194,9 @@
     box-shadow: 0 0 30px rgba(0,0,0,.2);
   }
   .sidebar.show { transform: translateX(0); }
+  /* Stop the menu above the bottom nav so its last items (User Management, …)
+     aren't hidden behind it, and the list scrolls fully clear of the bar. */
+  .sidebar { bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
 
   .sidebar-backdrop.show {
     display: block;

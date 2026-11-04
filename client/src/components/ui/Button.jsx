@@ -29,13 +29,14 @@ function classesFor(variant, size) {
 
 export function Button(props) {
     const { variant = 'primary', size = 'md', children } = props;
-    const className = classesFor(variant, size);
+    // An extra className (e.g. "filter-end", "mt-2") is ADDED to the button classes, never replaces them.
+    const className = [classesFor(variant, size), props.className].filter(Boolean).join(' ');
     if ('to' in props && props.to) {
         return (<Link to={props.to} className={className} aria-disabled={props.disabled}>
         {children}
       </Link>);
     }
-    const { to: _to, variant: _v, size: _s, children: _c, ...rest } = props;
+    const { to: _to, variant: _v, size: _s, children: _c, className: _cn, ...rest } = props;
     return (<button className={className} {...rest}>
       {children}
     </button>);

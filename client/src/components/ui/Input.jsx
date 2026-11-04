@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
+import { SmartSelect, MAX_VISIBLE_OPTIONS } from './SearchSelect';
 
 // ======================================================
 // START: Component Functions
@@ -42,10 +43,8 @@ export function Input({ label, hint, id, onClear, ...rest }) {
 export function Select({ label, value, onChange, options, hint, placeholder }) {
     return (<div className="form-row">
       <label>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((o) => (<option key={o}>{o}</option>))}
-      </select>
+      {/* <= 10 options: normal native select. More than 10: searchable list that shows 10 rows and scrolls the rest. */}
+      <SmartSelect value={value} onChange={onChange} options={options} placeholder={placeholder}/>
       {hint && <div className="hint">{hint}</div>}
     </div>);
 }
@@ -74,14 +73,21 @@ export function Select({ label, value, onChange, options, hint, placeholder }) {
 
 export function MultiSelect({ label, value, onChange, options, allLabel, hint }) {
     const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
     const rootRef = useRef(null);
     const allText = allLabel ?? `All ${label}`;
+    const searchable = options.length > MAX_VISIBLE_OPTIONS;
+    const shown = query.trim()
+        ? options.filter((o) => String(o).toLowerCase().includes(query.trim().toLowerCase()))
+        : options;
 
     useEffect(() => {
         if (!open) return undefined;
         const onDocClick = (e) => {
-            if (rootRef.current && !rootRef.current.contains(e.target))
+            if (rootRef.current && !rootRef.current.contains(e.target)) {
                 setOpen(false);
+                setQuery('');
+            }
         };
         document.addEventListener('mousedown', onDocClick);
         return () => document.removeEventListener('mousedown', onDocClick);
@@ -114,15 +120,22 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
           <span className="multiselect-caret"><Icon name="chevronDown" size={14}/></span>
         </button>
         {open && (<div className="multiselect-panel">
+            {searchable && (<div className="multiselect-search">
+                <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${options.length} options…`} aria-label="Search options" autoComplete="off"/>
+              </div>)}
             <label className="multiselect-option multiselect-option-all">
               <input type="checkbox" checked={allSelected} onChange={toggleAll}/>
               <span>{allText}</span>
             </label>
             <div className="multiselect-divider"/>
-            {options.map((opt) => (<label className="multiselect-option" key={opt}>
-                <input type="checkbox" checked={ticked.includes(opt)} onChange={() => toggleOption(opt)}/>
-                <span>{opt}</span>
-              </label>))}
+            {/* shows 10 rows, the rest scrolls */}
+            <div className="multiselect-list">
+              {shown.map((opt) => (<label className="multiselect-option" key={opt}>
+                  <input type="checkbox" checked={ticked.includes(opt)} onChange={() => toggleOption(opt)}/>
+                  <span>{opt}</span>
+                </label>))}
+              {shown.length === 0 && <div className="ss-empty">No matches</div>}
+            </div>
           </div>)}
       </div>
       {hint && <div className="hint">{hint}</div>}

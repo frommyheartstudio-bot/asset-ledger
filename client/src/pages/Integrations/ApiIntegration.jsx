@@ -14,6 +14,7 @@ import { AppLayout } from '../../layout/AppLayout';
 import { Pill } from '../../components/ui/ui';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
+import { DEFAULT_API_KEY } from '../../config/defaultApiKey';
 
 const KEY_STORE = 'assetLedger.apiPage.key';
 
@@ -84,7 +85,7 @@ export function ApiIntegration() {
     const [reqId, setReqId] = useState('Addition');
     const [path, setPath] = useState(EVENT_PATH.Addition);
     const [body, setBody] = useState(() => singleBody('Addition'));
-    const [apiKey, setApiKey] = useState(() => { try { return sessionStorage.getItem(KEY_STORE) ?? ''; } catch { return ''; } });
+    const [apiKey, setApiKey] = useState(() => { try { return sessionStorage.getItem(KEY_STORE) ?? DEFAULT_API_KEY; } catch { return DEFAULT_API_KEY; } });
     const [sending, setSending] = useState(false);
     const [bodyError, setBodyError] = useState('');
     const [response, setResponse] = useState(null);
@@ -142,7 +143,7 @@ export function ApiIntegration() {
           <div className="form-row">
             <label htmlFor="api-key">API key (npm run service-account -- create &lt;name&gt;)</label>
             <input id="api-key" type="password" autoComplete="off" value={apiKey} onChange={(e) => changeKey(e.target.value)} placeholder="paste the full key, e.g. alk_..."/>
-            <div className="hint">Kept only for this browser tab.</div>
+            <div className="hint">{apiKey === DEFAULT_API_KEY && DEFAULT_API_KEY ? 'Default key is pre-filled. ' : ''}Kept only for this browser tab.</div>
           </div>
 
           <div className="form-row">

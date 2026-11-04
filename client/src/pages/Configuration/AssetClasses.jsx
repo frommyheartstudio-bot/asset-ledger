@@ -15,6 +15,7 @@ import { configApi } from '../../api/config.api';
 import { downloadCsv } from '../../utils/csv';
 import { getActiveAssetClassTable, invalidateCustomAssetClasses, setActiveAssetClassTable } from '../../hooks/useAssetClasses';
 import { Icon } from '../../components/ui/Icon';
+import { SmartSelect } from '../../components/ui/SearchSelect';
 
 // ======================================================
 // START: Page Component
@@ -268,9 +269,10 @@ function CustomTable({ defaultRows, query, onDeleteDefault }) {
         } finally { setBusy(false); }
     };
 
-    const sel = (key, list) => (<select className="btn btn-ghost" value={draft[key]} onChange={(e) => set(key, e.target.value)}>
-        {unique([...list, draft[key]]).map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>);
+    const sel = (key, list) => (<SmartSelect
+        value={draft[key]} onChange={(v) => set(key, v)} options={unique([...list, draft[key]])} allowEmpty={false}
+        className="ss-compact" nativeClassName="btn btn-ghost"
+      />);
 
     const editRow = (key) => (<tr key={key}>
                   <td>{sel('book', opts.books)}</td>
@@ -420,9 +422,10 @@ export function AssetClasses() {
             setEditError(e.message || 'Could not save the row.');
         } finally { setEditBusy(false); }
     };
-    const edSel = (key, list) => (<select className="btn btn-ghost" value={editDraft[key]} onChange={(e) => setEd(key, e.target.value)}>
-        {unique([...list, editDraft[key]]).map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>);
+    const edSel = (key, list) => (<SmartSelect
+        value={editDraft[key]} onChange={(v) => setEd(key, v)} options={unique([...list, editDraft[key]])} allowEmpty={false}
+        className="ss-compact" nativeClassName="btn btn-ghost"
+      />);
 
     // Delete one row of the Default Table (used by both tables' Delete buttons).
     const [deletingId, setDeletingId] = useState(null);
@@ -452,12 +455,11 @@ export function AssetClasses() {
       </div>
 
       <div className="card mb-4">
-        <div className="card-pad flex items-center gap-4" style={{ flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 200 }}>
-            <div className="hint" style={{ marginTop: 0, marginBottom: 4 }}>Table (used by Asset Type dropdowns)</div>
+        <div className="card-pad filter-bar">
+          <div className="filter-field" style={{ minWidth: 200 }}>
+            <div className="hint">Table (used by Asset Type dropdowns)</div>
             <select
               className="btn btn-ghost"
-              style={{ width: '100%', textAlign: 'left' }}
               value={tab}
               onChange={(e) => { setTab(e.target.value); setActiveAssetClassTable(e.target.value); setQuery(''); }}
             >
@@ -465,17 +467,16 @@ export function AssetClasses() {
               <option value="custom">Customize Table</option>
             </select>
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="hint" style={{ marginTop: 0, marginBottom: 4 }}>Search</div>
+          <div className="filter-field" style={{ flex: 1, minWidth: 220 }}>
+            <div className="hint">Search</div>
             <input
               className="btn btn-ghost"
-              style={{ width: '100%', textAlign: 'left' }}
               placeholder="Search name, property type, method, or convention..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          {tab === 'default' && (<Button variant="ghost" onClick={() => exportAssetClassesCsv(filtered, 'asset_classes.csv')} style={{ marginLeft: 'auto' }}>
+          {tab === 'default' && (<Button variant="ghost" onClick={() => exportAssetClassesCsv(filtered, 'asset_classes.csv')} className="filter-end">
             Export CSV
           </Button>)}
         </div>

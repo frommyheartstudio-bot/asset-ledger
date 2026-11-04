@@ -20,10 +20,10 @@ import { generateStrongPassword, passwordStrengthIssues } from '../../utils/pass
 // ======================================================
 
 function EyeIcon({ open }) {
-    return open ? (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    return open ? (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/>
       <circle cx="12" cy="12" r="3"/>
-    </svg>) : (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    </svg>) : (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.9 19.9 0 0 1 4.22-5.94M9.9 4.24A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
       <path d="M1 1l22 22"/>
     </svg>);
@@ -56,37 +56,31 @@ export function PasswordInput({
 
     return (<div className="form-row">
       <label htmlFor={inputId}>{label}</label>
-      <div style={{ position: 'relative' }}>
+      {/* One bordered flex row: [ input | eye | Generate ]. Nothing is absolutely
+          positioned, so the eye can never sit under (or get hidden by) the
+          Generate button on narrow phones. */}
+      <div className="pw-field">
         <input
           id={inputId}
           type={visible ? 'text' : 'password'}
           value={value}
           onChange={onChange}
-          style={{ paddingRight: showGenerate ? 76 : 38 }}
           {...rest}
         />
         <button
           type="button"
+          className="pw-eye"
           onClick={() => setVisible((v) => !v)}
           title={visible ? 'Hide password' : 'View password'}
           aria-label={visible ? 'Hide password' : 'View password'}
-          style={{
-            position: 'absolute', right: showGenerate ? 62 : 8, top: '50%', transform: 'translateY(-50%)',
-            background: 'none', border: 'none', padding: 4, cursor: 'pointer',
-            color: 'var(--text-light, #94a3b8)', display: 'flex'
-          }}
         >
           <EyeIcon open={visible}/>
         </button>
         {showGenerate && (<button
             type="button"
+            className="pw-generate"
             onClick={handleGenerate}
             title="Auto-generate a strong password"
-            style={{
-                position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-                background: 'var(--bg, #f1f5f9)', border: '1px solid var(--border)', borderRadius: 5,
-                padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: 'var(--accent, #2563eb)'
-            }}
           >
             Generate
           </button>)}

@@ -25,11 +25,11 @@ export function AssetClassFinder({ classNames, onPick }) {
     }
     const inTable = (code) => classNames.find((n) => n === code || n === `US-${code}` || n === code.replace(/\.0$/, ''));
 
-    return (<div style={{ background: 'var(--bg-soft, #f1f5f9)', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Find asset class (IRS Pub 946)</div>
-      <div style={{ display: 'flex', gap: 8 }}>
+    return (<div className="class-finder">
+      <div className="class-finder-title">Find asset class (IRS Pub 946)</div>
+      <div className="class-finder-row">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && find()}
-          placeholder="e.g. Dell laptop, delivery truck, office desk" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}/>
+          placeholder="e.g. Dell laptop, delivery truck" aria-label="Describe the asset"/>
         <button type="button" onClick={find} disabled={busy} className="btn btn-primary">{busy ? 'Searching…' : 'Find'}</button>
       </div>
       {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '8px 0 0' }}>{error}</p>}
@@ -37,10 +37,10 @@ export function AssetClassFinder({ classNames, onPick }) {
         {result.matches.length === 0 && <p style={{ fontSize: 12, margin: 0 }}>No match found. Pick the Asset Class manually below.</p>}
         {result.matches.map((m) => {
             const target = inTable(m.code);
-            return (<div key={m.code} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: '1px solid #e2e8f0', fontSize: 12 }}>
-              <div><strong>{m.code}</strong> · GDS {m.gds} yrs · ADS {m.ads || '—'} yrs · class life {m.classLife}
+            return (<div key={m.code} className="class-finder-match">
+              <div className="class-finder-match-text"><strong>{m.code}</strong> · GDS {m.gds} yrs · ADS {m.ads || '—'} yrs · class life {m.classLife}
                 <div style={{ color: '#64748b' }}>{m.description}</div></div>
-              <button type="button" className="btn" disabled={!target} title={target ? '' : 'This class is not in your Asset Classes table'}
+              <button type="button" className="btn btn-ghost btn-sm class-finder-use" disabled={!target} title={target ? '' : 'This class is not in your Asset Classes table'}
                 onClick={() => onPick(target)}>{target ? 'Use' : 'Not in table'}</button>
             </div>);
         })}

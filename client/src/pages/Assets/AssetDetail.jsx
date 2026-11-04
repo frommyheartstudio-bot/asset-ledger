@@ -394,7 +394,7 @@ export function AssetDetail() {
             <h3>Posted Transactions</h3>
             <span className="text-sm text-muted">From Postgres · click a row for the full calculation</span>
           </div>
-          <AssetTransactionsPanel assetNumber={asset.assetNumber}/>
+          <AssetTransactionsPanel assetNumber={asset.assetNumber} asset={asset}/>
         </div>)}
 
       {tab === 'Audit Trail' && (<div className="card">
@@ -403,7 +403,7 @@ export function AssetDetail() {
             <span className="text-sm text-muted">Who changed what, and when · from Postgres</span>
           </div>
           <div className="card-pad">
-            <AuditTrailPanel assetNumber={asset.assetNumber}/>
+            <AuditTrailPanel assetNumber={asset.assetNumber} asset={asset}/>
           </div>
         </div>)}
 

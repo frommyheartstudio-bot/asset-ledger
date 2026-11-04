@@ -20,6 +20,7 @@ import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook } from '../../hooks/useBooks';
 import { Icon } from '../../components/ui/Icon';
+import { buildForecastCsv, downloadCsv } from '../../utils/csv';
 
 // ======================================================
 // START: Page Component
@@ -125,6 +126,12 @@ export function Forecasting() {
                 .finally(() => setMonthlyLoading(false));
         }
     }
+    // Export Forecast: downloads what is on screen (same book, horizon and filters) as a CSV.
+    function exportForecast() {
+        if (!data) return;
+        const scope = `${applied.company ? applied.company.map((c) => companyName(c)).join('; ') : 'All companies'} / ${applied.assetType ? applied.assetType.join('; ') : 'All asset types'}`;
+        downloadCsv(`forecast_${book}_${years}yr.csv`.replace(/[^\w.-]+/g, '_'), buildForecastCsv(data, { book, years, scope }));
+    }
     const yearPg = usePagination(data?.expenseByYear ?? []);
     const rollPg = usePagination(data?.rollForward ?? []);
 
@@ -140,7 +147,7 @@ export function Forecasting() {
               <option key={n} value={n}>Next {n} Year{n > 1 ? 's' : ''}</option>
             ))}
           </select>
-          <Button variant="primary" to="/reporting">
+          <Button variant="primary" onClick={exportForecast} disabled={!data} title={data ? 'Download this forecast as a CSV file' : 'Waiting for the forecast to load'}>
             Export Forecast
           </Button>
         </div>

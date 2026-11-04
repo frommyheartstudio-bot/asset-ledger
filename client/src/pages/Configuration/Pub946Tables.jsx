@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
+import { SmartSelect } from '../../components/ui/SearchSelect';
 import { configApi } from '../../api/config.api';
 import { downloadCsv } from '../../utils/csv';
 import { Icon } from '../../components/ui/Icon';
@@ -74,20 +75,23 @@ export function Pub946Tables() {
       </div>
 
       <div className="card mb-4">
-        <div className="card-pad flex items-center gap-4" style={{ flexWrap: 'wrap' }}>
-          <div className="pub946-rate-field">
-            <div className="hint" style={{ marginTop: 0, marginBottom: 4 }}>Rate Table</div>
-            <select className="btn btn-ghost pub946-rate-select" value={table?.id} onChange={(e) => setSelectedId(e.target.value)}>
-              {filteredTables.map((t) => (<option key={t.id} value={t.id}>{t.id} — {t.shortName}</option>))}
-            </select>
+        <div className="card-pad filter-bar">
+          <div className="filter-field pub946-rate-field">
+            <div className="hint">Rate Table</div>
+            {/* 24 tables: shows 10 at a time, scrolls the rest, and can be searched (e.g. type "A-7" or "mid-quarter") */}
+            <SmartSelect
+              value={table?.id ?? ''} onChange={setSelectedId}
+              options={filteredTables.map((t) => ({ value: t.id, label: `${t.id} — ${t.shortName}` }))}
+              className="pub946-rate-select" nativeClassName="btn btn-ghost pub946-rate-select"
+            />
           </div>
-          <div>
-            <div className="hint" style={{ marginTop: 0, marginBottom: 4 }}>Convention</div>
+          <div className="filter-field">
+            <div className="hint">Convention</div>
             <select className="btn btn-ghost" value={convention} onChange={(e) => setConvention(e.target.value)}>
               {CONVENTIONS.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
             </select>
           </div>
-          <Button variant="ghost" onClick={() => table && exportTableCsv(table)} style={{ marginLeft: 'auto' }}>
+          <Button variant="ghost" onClick={() => table && exportTableCsv(table)} className="filter-end">
             Export CSV
           </Button>
         </div>

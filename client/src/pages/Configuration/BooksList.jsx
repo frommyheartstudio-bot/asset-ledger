@@ -58,18 +58,17 @@ export function BooksList() {
       </div>
 
       <div className="card mb-4">
-        <div className="card-pad flex items-center gap-4" style={{ flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="hint" style={{ marginTop: 0, marginBottom: 4 }}>Search</div>
+        <div className="card-pad filter-bar">
+          <div className="filter-field" style={{ flex: 1, minWidth: 220 }}>
+            <div className="hint">Search</div>
             <input
               className="btn btn-ghost"
-              style={{ width: '100%', textAlign: 'left' }}
               placeholder="Search book name or description..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <Button variant="ghost" onClick={() => exportBooksCsv(filtered)} style={{ marginLeft: 'auto' }}>Export CSV</Button>
+          <Button variant="ghost" onClick={() => exportBooksCsv(filtered)} className="filter-end">Export CSV</Button>
         </div>
       </div>
 

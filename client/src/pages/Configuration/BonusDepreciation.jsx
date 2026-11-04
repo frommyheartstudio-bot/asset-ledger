@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
+import { SmartSelect } from '../../components/ui/SearchSelect';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { useBonusRates } from '../../hooks/useBonusRates';
 import { useBooks } from '../../hooks/useBooks';
@@ -140,10 +141,12 @@ function CustomBonusTable() {
         } finally { setBusy(false); }
     };
 
-    const sel = (key, list) => (<select className="btn btn-ghost" style={{ width: '100%', minWidth: 96, maxWidth: 170 }} value={draft[key]} onChange={(e) => set(key, e.target.value)}>
-        <option value="">- (All)</option>
-        {Array.from(new Set([...list, draft[key]].filter(Boolean))).map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>);
+    const sel = (key, list) => (<SmartSelect
+        value={draft[key]} onChange={(v) => set(key, v)}
+        options={Array.from(new Set([...list, draft[key]].filter(Boolean)))} placeholder="- (All)"
+        className="ss-compact" style={{ width: '100%', minWidth: 96, maxWidth: 170 }}
+        nativeClassName="btn btn-ghost" nativeStyle={{ width: '100%', minWidth: 96, maxWidth: 170 }}
+      />);
 
     const editRow = (key) => (<tr key={key}>
       <td>{sel('book', bookNames)}</td>
