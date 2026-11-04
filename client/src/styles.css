@@ -749,3 +749,10 @@ select.btn { cursor: pointer; }
 .tabs { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs .tab { flex: 0 0 auto; white-space: nowrap; }
+
+/* Stacked table cards: never break a label or a status pill in the middle of a word */
+@media (max-width: 767px) {
+  .table td::before { overflow-wrap: normal; word-break: normal; min-width: min-content; }
+  .table td > .pill { flex: 0 0 auto; white-space: nowrap; }
+  .table td > .pill + * { flex: 1 1 0; min-width: 0; }   /* the message text beside the pill takes the leftover space and wraps */
+}
