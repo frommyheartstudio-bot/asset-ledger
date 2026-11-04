@@ -79,6 +79,14 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
         try { await authApi.deleteNotification(seq); } catch { /* next poll will restore it if the delete failed */ }
     };
 
+    // "Delete all": clear the whole list in one go (asks first, since it cannot be undone).
+    const removeAllNotifications = async (e) => {
+        e.stopPropagation();
+        if (!window.confirm('Delete all notifications? This cannot be undone.')) return;
+        setLogins([]);
+        try { await authApi.deleteAllNotifications(); } catch { /* next poll will restore them if the delete failed */ }
+    };
+
     function timeAgo(iso) {
         const ms = Date.now() - new Date(iso).getTime();
         const min = Math.round(ms / 60000);
@@ -150,7 +158,10 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
       <div className={`icon-btn notif-btn ${canSeeLogins ? '' : 'notif-btn-static'}`} title="Notifications" ref={notifRef} onClick={canSeeLogins ? toggleNotifications : undefined} style={{ position: 'relative', cursor: canSeeLogins ? 'pointer' : 'default' }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>{unseenLogins.length > 0 && <span className="badge-dot"/>}
         {notifOpen && (<div className="account-dropdown notif-dropdown">
-            <div className="account-dropdown-who">Notifications</div>
+            <div className="account-dropdown-who notif-head">
+              <span>Notifications</span>
+              {logins.length > 0 && (<button type="button" className="notif-clear-all" title="Delete all notifications" onClick={removeAllNotifications}>Delete all</button>)}
+            </div>
             {logins.length === 0 && <div className="notif-empty">Nothing yet.</div>}
             {logins.map((n) => (<div className="notif-item" key={n.seq} style={n.type === 'registration' ? { cursor: 'pointer' } : undefined} onClick={n.type === 'registration' ? () => { setNotifOpen(false); navigate('/users'); } : undefined}>
                 <button type="button" className="notif-close" title="Delete notification" aria-label="Delete notification" onClick={(e) => removeNotification(e, n.seq)}>✕</button>

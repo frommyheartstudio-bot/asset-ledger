@@ -106,9 +106,6 @@ export function Dashboard() {
           <p>Fixed asset overview for {periodLabel} · {book} book</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" disabled title="Export is coming soon">
-            Export
-          </Button>
           <Button variant="primary" to="/lifecycle">
             + New Transaction
           </Button>

@@ -14,12 +14,12 @@ import { assets, findAsset } from '../data/assets.js';
 import { computeDashboardSummary } from '../data/activity.js';
 import { resolveBook } from '../data/books.js';
 import { primeBookRules, viewAssetsForBook } from '../services/book-view.js';
+import { localAnswer } from '../services/chat-local.js';
 import { EVENT_FIELD_HELP, cancelPending, confirmPending, normalizeEventType, proposeEvent, type ActionCard } from '../services/agent-actions.js';
 
 export const chatRouter = Router();
 
 export const MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5-5';
-const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
 // ---------- Read-only tools (the agent can look, never change) ----------
 
@@ -157,7 +157,7 @@ async function askClaude(message: string, history: { role: string; text: string 
       },
       body: JSON.stringify({ model: MODEL, max_tokens: 800, system: systemPrompt(page, role), tools, messages })
     });
-    if (!r.ok) throw new Error(`Claude API ${r.status}`);
+    if (!r.ok) throw new Error(`Claude API ${r.status}: ${(await r.text()).slice(0, 300)}`);
     const data: any = await r.json();
 
     if (data.stop_reason !== 'tool_use') {
@@ -174,45 +174,6 @@ async function askClaude(message: string, history: { role: string; text: string 
   return { reply: "Sorry, I couldn't work out an answer to that. Could you rephrase it?", actions: ctx.actions };
 }
 
-// ---------- Built-in mode (no API key) ----------
-
-async function localAnswer(message: string, assetNumber?: string): Promise<string> {
-  const t = message.toLowerCase();
-  await primeBookRules();
-  const book = resolveBook(undefined);
-  const all = viewAssetsForBook(assets, book);
-
-  // Any word that contains a digit could be an asset number (009, 0202, 77777779, A-100 ...).
-  const tokens: string[] = [...(message.match(/[A-Za-z0-9-]*\d[A-Za-z0-9-]*/g) ?? [])];
-  if (assetNumber) tokens.push(assetNumber);
-  const bare = /^[A-Za-z0-9-]*\d[A-Za-z0-9-]*$/.test(message.trim()) ? message.trim() : null;
-
-  for (const tok of tokens) {
-    const a = all.find((x) => x.assetNumber.toLowerCase() === tok.toLowerCase());
-    if (a) {
-      return `${a.assetNumber} - ${a.description}\nClass: ${a.assetClass} | Status: ${a.status}\nCost ${money(a.cost)}, Accum. Dep ${money(a.accumDepreciation)}, NBV ${money(a.nbv)}.`;
-    }
-  }
-  if (bare) {
-    const partial = all.filter((x) => x.assetNumber.toLowerCase().includes(bare.toLowerCase()));
-    if (partial.length) {
-      return `${partial.length} asset(s) matching ${bare}:\n` + partial.slice(0, 8).map((x) => `${x.assetNumber} - ${x.description}`).join('\n');
-    }
-    return `No asset found with number ${bare}. Open the Asset Register to search.`;
-  }
-  if (/(summary|total|how many|count|dashboard|nbv|book value|cost)/.test(t)) {
-    const s: any = computeDashboardSummary(resolveBook(undefined));
-    return `Active assets: ${s.totalAssets}\nGross cost: ${money(s.grossCost)}\nNet book value: ${money(s.netBookValue)}\nAccumulated depreciation: ${money(s.ytdDepreciation)}`;
-  }
-  const status = (['Retired', 'Fully Depreciated', 'Under Review', 'Transferred', 'Active'] as const).find((s) => t.includes(s.toLowerCase()));
-  if (status) {
-    const list = assets.filter((a) => a.status === status);
-    if (!list.length) return `There are no ${status.toLowerCase()} assets.`;
-    return `${list.length} ${status.toLowerCase()} asset(s):\n` + list.slice(0, 6).map((a) => `${a.assetNumber} - ${a.description}`).join('\n');
-  }
-  return 'I could not find data for that. Try "total assets", "net book value", "retired assets", or type an asset number. (For full AI answers, add ANTHROPIC_API_KEY to server/.env.)';
-}
-
 // ---------- Route ----------
 
 chatRouter.post('/', async (req, res) => {
@@ -223,10 +184,15 @@ chatRouter.post('/', async (req, res) => {
   try {
     await primeBookRules();
     if (process.env.ANTHROPIC_API_KEY) {
-      const { reply, actions } = await askClaude(message.slice(0, 1000), history, page, role, canEdit === true);
-      return res.json({ reply, mode: 'ai', actions });
+      try {
+        const { reply, actions } = await askClaude(message.slice(0, 1000), history, page, role, canEdit === true);
+        if (reply) return res.json({ reply, mode: 'ai', actions });
+      } catch (aiErr) {
+        // Bad key, no credit, rate limit, network: log the real reason, then still answer from the live data.
+        console.error('[chat] Claude failed, using built-in answers:', aiErr);
+      }
     }
-    res.json({ reply: await localAnswer(message, assetNumber), mode: 'local' });
+    return res.json({ reply: await localAnswer(message, assetNumber), mode: 'local' });
   } catch (err) {
     console.error('[chat] failed:', err);
     res.json({ reply: "Sorry, I can't answer right now. Please try again in a moment.", mode: 'error' });

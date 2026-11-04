@@ -126,6 +126,9 @@
 
 /* ---------- Notifications ---------- */
 .notif-dropdown { width: 280px; max-height: 320px; overflow-y: auto; text-align: left; }
+.notif-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.notif-clear-all { border: none; background: transparent; color: var(--red); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.notif-clear-all:hover { background: #fee2e2; }
 .notif-empty { padding: 14px; font-size: 13px; color: var(--text-muted); }
 .notif-item { position: relative; padding: 10px 30px 10px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
 .notif-item:last-child { border-bottom: none; }

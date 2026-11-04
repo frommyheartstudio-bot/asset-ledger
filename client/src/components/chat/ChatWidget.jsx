@@ -211,12 +211,16 @@ export function ChatWidget({ variant = 'assistant', open, setOpen }) {
       </button>
     </>);
 }
-// Both launchers side by side; opening one closes the other.
+// The AI Agent (sparkle button) is switched off for now. Set this to true to bring it back
+// (it also needs ANTHROPIC_API_KEY on the server).
+const SHOW_AI_AGENT = false;
+
+// Launchers: the Asset Assistant robot, plus the AI Agent when SHOW_AI_AGENT is on.
 export function ChatLaunchers() {
     const [active, setActive] = useState(null);
     return (<>
       <ChatWidget variant="assistant" open={active === 'assistant'} setOpen={(v) => setActive(v ? 'assistant' : null)}/>
-      <ChatWidget variant="agent" open={active === 'agent'} setOpen={(v) => setActive(v ? 'agent' : null)}/>
+      {SHOW_AI_AGENT && <ChatWidget variant="agent" open={active === 'agent'} setOpen={(v) => setActive(v ? 'agent' : null)}/>}
     </>);
 }
 

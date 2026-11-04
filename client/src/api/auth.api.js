@@ -14,7 +14,8 @@ export const authApi = {
     logout: (id) => api.post('/auth/logout', { id }),
     register: (name, email, password) => api.post('/auth/register', { name, email, password }),
     getLoginNotifications: () => api.get('/auth/notifications'),
-    deleteNotification: (seq) => api.del(`/auth/notifications/${seq}`)
+    deleteNotification: (seq) => api.del(`/auth/notifications/${seq}`),
+    deleteAllNotifications: () => api.del('/auth/notifications')
 };
 
 // ======================================================

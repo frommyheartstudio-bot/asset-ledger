@@ -4,7 +4,7 @@
 // ======================================================
 
 import { Router } from 'express';
-import { addNotification, createUser, deleteNotification, emailTaken, listNotifications, markInactive, verifyLogin } from '../db/repo.js';
+import { addNotification, createUser, deleteAllNotifications, deleteNotification, emailTaken, listNotifications, markInactive, verifyLogin } from '../db/repo.js';
 
 // ======================================================
 // START: Route Handlers
@@ -143,6 +143,12 @@ authRouter.post('/register', async (req, res) => {
 
 authRouter.get('/notifications', async (_req, res) => {
   res.json(await listNotifications());
+});
+
+// DELETE /notifications — the "Delete all" button (clears the whole feed).
+authRouter.delete('/notifications', async (_req, res) => {
+  const removed = await deleteAllNotifications();
+  res.json({ ok: true, removed });
 });
 
 // DELETE /notifications/:seq — the X button on a notification.

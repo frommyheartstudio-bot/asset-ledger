@@ -1353,6 +1353,17 @@ export async function deleteNotification(seq: number): Promise<boolean> {
 }
 
 // ======================================================
+// Function : deleteAllNotifications
+// Purpose  : Deletes every notification (the "Delete all" button); returns how many were removed.
+// ======================================================
+
+export async function deleteAllNotifications(): Promise<number> {
+  await ensureNotificationsTable();
+  const result = await pool.query(`DELETE FROM notifications`);
+  return result.rowCount ?? 0;
+}
+
+// ======================================================
 // Function : loadAssetTypeConfig
 // Purpose  : Reads the depreciation asset-type table (code, label,
 //            property type, method, convention, rate) from Postgres,
