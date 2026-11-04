@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { configApi } from '../../api/config.api';
 import { downloadCsv } from '../../utils/csv';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -102,7 +103,7 @@ export function Pub946Tables() {
           <div className="card-pad" style={{ paddingTop: 0, paddingBottom: 4 }}>
             <p className="text-muted text-sm">{table.subtitle}</p>
           </div>
-          <p className="pub946-swipe-hint">← Swipe sideways to see all columns →</p>
+          <p className="pub946-swipe-hint"><Icon name="arrowLeft" size={12}/> Swipe sideways to see all columns <Icon name="arrowRight" size={12}/></p>
           <div className="table-wrap pub946-table-wrap" tabIndex={0}>
             <table className="table pub946-table">
               <thead>

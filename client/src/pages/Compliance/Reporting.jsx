@@ -21,6 +21,7 @@ import { companyName } from '../../utils/companies';
 import { downloadCsv } from '../../utils/csv';
 import { getDefaultBook, getBookNames } from '../../hooks/useBooks';
 import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
+import { GlyphOrIcon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -33,7 +34,7 @@ const ICO = {
 };
 const ICON = {
     'depreciation-detail': '▤',
-    'roll-forward': '↻',
+    'roll-forward': 'refresh',
     'form-4562': '⊞'
 };
 const STATUS_TONE = { Ready: 'green', Draft: 'amber', Processing: 'blue' };
@@ -498,7 +499,7 @@ export function Reporting() {
           // Tax Form 4562 is display-only: clicking it does nothing (no modal).
           const inactive = r.key === 'form-4562';
           return (<div className={`report-card${inactive ? ' report-card-inactive' : ''}`} key={r.key} onClick={inactive ? undefined : () => openCustomReport(r.name)} style={inactive ? undefined : { cursor: 'pointer' }}>
-            <div className={`ri ${ICO[r.key] ?? 'ico-blue'}`}>{ICON[r.key] ?? '▤'}</div>
+            <div className={`ri ${ICO[r.key] ?? 'ico-blue'}`}><GlyphOrIcon icon={ICON[r.key] ?? '▤'}/></div>
             <div>
               <h4>{r.name}</h4>
               <p>{r.description}</p>

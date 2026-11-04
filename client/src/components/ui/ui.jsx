@@ -3,6 +3,7 @@
 // Purpose   : Reusable UI component: ui
 // ======================================================
 
+import { GlyphOrIcon } from './Icon';
 
 // ======================================================
 // START: Component Functions
@@ -17,7 +18,7 @@ export function StatCard({ label, value, icoClass, icon, delta, deltaDirection }
     return (<div className="card card-pad stat">
       <div className="top">
         <span className="label">{label}</span>
-        {icon && <span className={`ico-box ${icoClass ?? ''}`}>{icon}</span>}
+        {icon && <span className={`ico-box ${icoClass ?? ''}`}><GlyphOrIcon icon={icon}/></span>}
       </div>
       <div className="value">{value}</div>
       {delta && <div className={`delta ${deltaDirection ?? ''}`}>{delta}</div>}

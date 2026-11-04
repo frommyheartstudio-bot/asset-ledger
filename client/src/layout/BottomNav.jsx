@@ -4,6 +4,7 @@
 // ======================================================
 
 import { NavLink } from 'react-router-dom';
+import { GlyphOrIcon } from '../components/ui/Icon';
 
 // ======================================================
 // START: Layout Component
@@ -16,7 +17,7 @@ import { NavLink } from 'react-router-dom';
 const BOTTOM_NAV_ITEMS = [
     { id: 'dashboard', icon: '▤', label: 'Home', href: '/' },
     { id: 'assets', icon: '▦', label: 'Assets', href: '/assets' },
-    { id: 'lifecycle', icon: '⟳', label: 'Lifecycle', href: '/lifecycle' },
+    { id: 'lifecycle', icon: 'refresh', label: 'Lifecycle', href: '/lifecycle' },
     { id: 'modeling', icon: '◈', label: 'Modeling', href: '/modeling' }
 ];
 
@@ -29,7 +30,7 @@ const BOTTOM_NAV_ITEMS = [
 export function BottomNav({ active, moreOpen, onMoreClick }) {
     return (<nav className="bottom-nav" aria-label="Primary">
       {BOTTOM_NAV_ITEMS.map((it) => (<NavLink key={it.id} to={it.href} end className={`bottom-nav-item ${it.id === active ? 'active' : ''}`}>
-          <span className="ico">{it.icon}</span>
+          <span className="ico"><GlyphOrIcon icon={it.icon}/></span>
           <span className="txt">{it.label}</span>
         </NavLink>))}
       <button type="button" className={`bottom-nav-item bottom-nav-more ${moreOpen ? 'active' : ''}`} aria-expanded={moreOpen} aria-label="More" onClick={onMoreClick}>

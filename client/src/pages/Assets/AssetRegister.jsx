@@ -20,6 +20,7 @@ import { PagerBar } from '../../components/ui/Pagination';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook } from '../../hooks/useBooks';
 import { useFormOptions } from '../../hooks/useFormOptions';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -215,7 +216,7 @@ export function AssetRegister() {
                 Showing {filteredItems.length === 0 ? 0 : pageStart + 1}–{pageStart + pageItems.length} of {filteredItems.length.toLocaleString()}
               </span>
               <Button variant="ghost" size="sm" onClick={reload} disabled={loading}>
-                {loading ? 'Refreshing…' : '↻ Refresh'}
+                {loading ? 'Refreshing…' : (<><Icon name="refresh" size={14}/> Refresh</>)}
               </Button>
             </div>
           </div>

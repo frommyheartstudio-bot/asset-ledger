@@ -4,6 +4,7 @@
 // ======================================================
 
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 
 // ======================================================
 // START: Component Functions
@@ -110,7 +111,7 @@ export function MultiSelect({ label, value, onChange, options, allLabel, hint })
       <div className={`multiselect ${open ? 'is-open' : ''}`}>
         <button type="button" className="multiselect-trigger" onClick={() => setOpen((o) => !o)}>
           <span>{summary}</span>
-          <span className="multiselect-caret">▾</span>
+          <span className="multiselect-caret"><Icon name="chevronDown" size={14}/></span>
         </button>
         {open && (<div className="multiselect-panel">
             <label className="multiselect-option multiselect-option-all">

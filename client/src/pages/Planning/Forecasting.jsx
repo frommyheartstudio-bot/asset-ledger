@@ -19,6 +19,7 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { useAutoSelectAll } from '../../hooks/useAutoSelectAll';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook } from '../../hooks/useBooks';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -163,10 +164,10 @@ export function Forecasting() {
 
       {data && (<>
           <div className="grid grid-4 mb-4">
-            <StatCard label="FY2027 Projected Depr." value={formatCurrency(data.kpis.projectedDepreciationNextFY, { compact: true })} delta={`▲ ${data.kpis.projectedDepreciationDeltaPct}%`} deltaDirection="up"/>
-            <StatCard label="Planned CapEx" value={formatCurrency(data.kpis.plannedCapEx, { compact: true })} delta={`▲ ${data.kpis.plannedCapExProjects} projects`} deltaDirection="up"/>
+            <StatCard label="FY2027 Projected Depr." value={formatCurrency(data.kpis.projectedDepreciationNextFY, { compact: true })} delta={<><Icon name="triUp" size={10}/> {data.kpis.projectedDepreciationDeltaPct}%</>} deltaDirection="up"/>
+            <StatCard label="Planned CapEx" value={formatCurrency(data.kpis.plannedCapEx, { compact: true })} delta={<><Icon name="triUp" size={10}/> {data.kpis.plannedCapExProjects} projects</>} deltaDirection="up"/>
             <StatCard label="Assets Fully Depr. FY27" value={data.kpis.assetsFullyDepreciatingNextFY.toLocaleString()} delta="retiring basis" deltaDirection="down"/>
-            <StatCard label="Projected Ending NBV" value={formatCurrency(data.kpis.projectedEndingNbv, { compact: true })} delta={`▲ ${data.kpis.projectedEndingNbvDeltaPct}%`} deltaDirection="up"/>
+            <StatCard label="Projected Ending NBV" value={formatCurrency(data.kpis.projectedEndingNbv, { compact: true })} delta={<><Icon name="triUp" size={10}/> {data.kpis.projectedEndingNbvDeltaPct}%</>} deltaDirection="up"/>
           </div>
 
           <div className="card mb-4">
@@ -190,7 +191,7 @@ export function Forecasting() {
                     const isOpen = expandedYear === e.year;
                     return (<Fragment key={e.year}>
                       <tr onClick={() => toggleYear(e.year)} style={{ cursor: 'pointer' }}>
-                        <td><span style={{ display: 'inline-block', width: 14 }}>{isOpen ? '▾' : '▸'}</span>{e.year}</td>
+                        <td><Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={14} style={{ marginRight: 6 }}/>{e.year}</td>
                         <td className="num" data-label="Depreciation Expense">{formatCurrency(e.millions * 1e6, { compact: true })}</td>
                       </tr>
                       {isOpen && (<tr>

@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lifecycleApi } from '../../api/lifecycle.api';
+import { Icon } from '../ui/Icon';
 
 // ======================================================
 // START: Component Functions
@@ -74,7 +75,7 @@ export function PostEventMenu({ assetNumber, assetStatus }) {
 
     return (<div className="post-event-menu" ref={wrapRef}>
       <button type="button" className="btn btn-ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        Post Event {open ? '▴' : '▾'}
+        Post Event <Icon name={open ? 'chevronUp' : 'chevronDown'} size={14}/>
       </button>
 
       {open && (<div className="post-event-menu-panel">

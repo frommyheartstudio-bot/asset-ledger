@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/Button';
 import { FIELD_SCHEMAS } from '../../data/lifecycleFormSchemas';
 import { useFormOptions } from '../../hooks/useFormOptions';
 import { parseCsv, buildTemplateCsv, downloadCsv, rowsToLifecycleRows, EVENT_LABELS } from '../../utils/csv';
+import { Icon } from '../../components/ui/Icon';
 
 const EVENTS = EVENT_LABELS.map((label) => ({ label, id: label.toLowerCase() }));
 
@@ -80,7 +81,7 @@ export function ServiceApiTest() {
           <h1>Service API Test</h1>
           <p>Sends a CSV through the machine-to-machine endpoint the way an external system would — with an API key. Posts here are real and permanent, so use test asset numbers.</p>
         </div>
-        <Button variant="ghost" to="/lifecycle/bulk-import">← Back to Bulk Import</Button>
+        <Button variant="ghost" to="/lifecycle/bulk-import"><Icon name="arrowLeft" size={15}/> Back to Bulk Import</Button>
       </div>
 
       <div className="grid grid-2">

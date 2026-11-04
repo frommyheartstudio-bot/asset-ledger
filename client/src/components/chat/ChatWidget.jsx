@@ -12,6 +12,7 @@ import { renderRich } from './linkify';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import './chat.css';
+import { Icon } from '../ui/Icon';
 
 const SUGGESTIONS = ['How many assets do we have?', 'How to add a new asset?', 'How to retire an asset?', 'Show retired assets'];
 // Starter chips for the AI Agent (second icon).
@@ -187,7 +188,7 @@ export function ChatWidget({ variant = 'assistant', open, setOpen }) {
             {m.state === 'error' && <div className="chat-card-status bad">✗ {m.result}</div>}
           </div>) : (<div key={i} className={`chat-msg ${m.role}`}>
             {m.role === 'bot' ? renderRich(m.text, goTo) : m.text}
-            {m.link && (<button className="chat-link" onClick={() => goTo(m.link.to)}>{m.link.label} →</button>)}
+            {m.link && (<button className="chat-link" onClick={() => goTo(m.link.to)}>{m.link.label} <Icon name="arrowRight" size={13}/></button>)}
             {m.sources?.length > 0 && (<div className="chat-sources"><span>From the web:</span>
               {m.sources.map((x) => (<a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a>))}
             </div>)}
@@ -218,6 +219,12 @@ const SHOW_AI_AGENT = false;
 // Launchers: the Asset Assistant robot, plus the AI Agent when SHOW_AI_AGENT is on.
 export function ChatLaunchers() {
     const [active, setActive] = useState(null);
+    // The "?" Help button in the top bar asks for the assistant to open.
+    useEffect(() => {
+        const openAssistant = () => setActive('assistant');
+        window.addEventListener('assetledger:open-assistant', openAssistant);
+        return () => window.removeEventListener('assetledger:open-assistant', openAssistant);
+    }, []);
     return (<>
       <ChatWidget variant="assistant" open={active === 'assistant'} setOpen={(v) => setActive(v ? 'assistant' : null)}/>
       {SHOW_AI_AGENT && <ChatWidget variant="agent" open={active === 'agent'} setOpen={(v) => setActive(v ? 'agent' : null)}/>}

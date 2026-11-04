@@ -96,6 +96,20 @@ export function Login() {
     };
 
     return (<div className="login-screen">
+      <aside className="login-aside">
+        <div className="login-aside-brand">
+          <span className="mark">FA</span>
+          <span>AssetLedger</span>
+        </div>
+        <h2>Every asset, from purchase to disposal.</h2>
+        <ul>
+          <li>Depreciation across every tax and book basis</li>
+          <li>Additions, adjustments, transfers and retirements in one place</li>
+          <li>A full audit trail of who changed what, and when</li>
+        </ul>
+        <div className="login-aside-foot">Fixed Asset Management</div>
+      </aside>
+      <main className="login-main">
       <div className="login-card">
         <div className="login-brand">
           <div className="logo">
@@ -104,6 +118,9 @@ export function Login() {
           </div>
           <div className="sub">Fixed Asset Management</div>
         </div>
+
+        <h1 className="login-title">{mode === 'login' ? 'Sign in' : 'Create your account'}</h1>
+        <p className="login-lead">{mode === 'login' ? 'Welcome back. Enter your work email and password.' : 'An admin reviews every request before access is granted.'}</p>
 
         {mode === 'login' ? (<>
           <form onSubmit={handleSubmit}>
@@ -130,7 +147,7 @@ export function Login() {
           <div className="login-hint">Use a User Management account's email and password to sign in.</div>
           <div className="login-hint">
             New here?{' '}
-            <button type="button" onClick={() => switchMode('register')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary, #2563eb)', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" className="login-link" onClick={() => switchMode('register')}>
               Register
             </button>
           </div>
@@ -169,13 +186,14 @@ export function Login() {
             </form>
             <div className="login-hint">
               Already have access?{' '}
-              <button type="button" onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary, #2563eb)', fontWeight: 600, cursor: 'pointer' }}>
+              <button type="button" className="login-link" onClick={() => switchMode('login')}>
                 Sign In
               </button>
             </div>
           </>)}
         </>)}
       </div>
+      </main>
     </div>);
 }
 

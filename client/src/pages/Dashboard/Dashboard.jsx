@@ -13,6 +13,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook } from '../../hooks/useBooks';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -116,10 +117,10 @@ export function Dashboard() {
 
       {summary && (<>
           <div className="grid grid-4 mb-4" style={summaryLoading ? { opacity: 0.6 } : undefined}>
-            <StatCard label="Total Assets" value={summary.totalAssets.toLocaleString()} icon="▦" icoClass="ico-blue" delta={`▲ ${summary.addedThisPeriod} added this period`} deltaDirection="up"/>
-            <StatCard label="Gross Cost" value={formatCurrency(summary.grossCost, { compact: true })} icon="$" icoClass="ico-teal" delta={`▲ ${summary.grossCostYtdDeltaPct}% YTD`} deltaDirection="up"/>
-            <StatCard label="Net Book Value" value={formatCurrency(summary.netBookValue, { compact: true })} icon="◈" icoClass="ico-purple" delta={`▼ ${Math.abs(summary.depreciationDeltaPct)}% depreciation`} deltaDirection="down"/>
-            <StatCard label="YTD Depreciation" value={formatCurrency(summary.ytdDepreciation, { compact: true })} icon="▼" icoClass="ico-amber" delta="On schedule" deltaDirection="up"/>
+            <StatCard label="Total Assets" value={summary.totalAssets.toLocaleString()} icon="▦" icoClass="ico-blue" delta={<><Icon name="triUp" size={10}/> {summary.addedThisPeriod} added this period</>} deltaDirection="up"/>
+            <StatCard label="Gross Cost" value={formatCurrency(summary.grossCost, { compact: true })} icon="$" icoClass="ico-teal" delta={<><Icon name="triUp" size={10}/> {summary.grossCostYtdDeltaPct}% YTD</>} deltaDirection="up"/>
+            <StatCard label="Net Book Value" value={formatCurrency(summary.netBookValue, { compact: true })} icon="◈" icoClass="ico-purple" delta={<><Icon name="triDown" size={10}/> {Math.abs(summary.depreciationDeltaPct)}% depreciation</>} deltaDirection="down"/>
+            <StatCard label="YTD Depreciation" value={formatCurrency(summary.ytdDepreciation, { compact: true })} icon="triDown" icoClass="ico-amber" delta="On schedule" deltaDirection="up"/>
           </div>
 
           <div className="grid grid-2 mb-4">

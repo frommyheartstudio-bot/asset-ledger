@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { NavLink, useMatch } from 'react-router-dom';
 import { NAV } from './nav';
 import { useAuth } from '../context/AuthContext';
+import { Icon, GlyphOrIcon } from '../components/ui/Icon';
 
 // ======================================================
 // START: Layout Component
@@ -67,10 +68,10 @@ export function Sidebar({ active, open, onClose }) {
             return (<div className="nav-group" key={g.group}>
             {collapsible ? (<button type="button" className="label label-toggle" onClick={() => toggleGroup(g.group)} aria-expanded={isOpen}>
                 <span>{g.group}</span>
-                <span className={`chevron ${isOpen ? 'open' : ''}`}>▾</span>
+                <span className={`chevron ${isOpen ? 'open' : ''}`}><Icon name="chevronDown" size={14}/></span>
               </button>) : (<div className="label">{g.group}</div>)}
             {isOpen && visibleItems.map((it) => (<NavLink key={it.id} to={it.href} end className={`nav-item ${it.id === active ? 'active' : ''}`} onClick={onClose}>
-                <span className="ico">{it.icon}</span>
+                <span className="ico"><GlyphOrIcon icon={it.icon}/></span>
                 <span>{it.label}</span>
               </NavLink>))}
           </div>);

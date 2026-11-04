@@ -109,7 +109,7 @@ a:hover { text-decoration: underline; }
 .stat .ico-box { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
 .stat .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
 .stat .value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-.stat .delta { font-size: 12px; font-weight: 600; }
+.stat .delta { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
 .delta.up { color: var(--green); }
 .delta.down { color: var(--red); }
 .ico-blue { background: #dbeafe; color: var(--accent); }
@@ -208,7 +208,7 @@ a:hover { text-decoration: underline; }
 }
 .multiselect-trigger span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multiselect.is-open .multiselect-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
-.multiselect-caret { font-size: 10px; color: var(--text-light); flex: 0 0 auto; }
+.multiselect-caret { display: inline-flex; color: var(--text-light); flex: 0 0 auto; }
 .multiselect-panel {
   position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 100%;
   max-height: 240px; overflow-y: auto; background: var(--card); border: 1px solid var(--border);
@@ -403,8 +403,11 @@ a:hover { text-decoration: underline; }
    step-section cards in Htmls/pages/*.html. */
 .step-sections > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); list-style: none; }
 .step-sections > summary::-webkit-details-marker { display: none; }
-.step-sections > summary::before { content: '▸ '; }
-.step-sections[open] > summary::before { content: '▾ '; }
+.step-sections > summary::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 2px 3px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s;
+}
+.step-sections[open] > summary::before { transform: rotate(45deg); }
 .step-sections-body { max-height: 440px; overflow-y: auto; padding-right: 4px; }
 .step-section { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
 .step-section-header { background: #f8fafc; border-bottom: 1px solid var(--border); padding: 8px 12px; font-size: 12.5px; font-weight: 700; color: #334155; }
@@ -517,6 +520,7 @@ select.btn { cursor: pointer; }
 }
 .pager-btn {
   width: 40px; border: none; background: transparent; color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
   font-size: 22px; line-height: 1; cursor: pointer; font-family: inherit;
 }
 .pager-btn:hover:not(:disabled) { background: #eff6ff; }

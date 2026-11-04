@@ -29,6 +29,7 @@ import {
     EVENT_LABELS
 } from '../../utils/csv';
 import { useAuth } from '../../hooks/useAuth';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -61,7 +62,7 @@ export function BulkImport() {
           <h1>Bulk Import Lifecycle Events</h1>
           <p>Upload a CSV per event type to post many transactions at once — or use Master Data Set to mix any assets and any event types in one CSV.</p>
         </div>
-        <Button variant="ghost" to="/lifecycle/service-api">Test Service API →</Button>
+        <Button variant="ghost" to="/lifecycle/service-api">Test Service API <Icon name="arrowRight" size={15}/></Button>
       </div>
 
       <div className="grid grid-2">

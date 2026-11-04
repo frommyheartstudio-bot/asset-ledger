@@ -19,8 +19,8 @@ export const NAV = [
         items: [
             { id: 'assets', icon: '▦', label: 'Asset Register', href: '/assets', capability: 'viewAssets' },
             { id: 'detail', icon: '▣', label: 'Asset Detail', href: '/assets/845862189', capability: 'viewAssets' },
-            { id: 'lifecycle', icon: '⟳', label: 'Lifecycle Events', href: '/lifecycle', capability: 'postEvents' },
-            { id: 'bulk-import', icon: '⇪', label: 'Bulk Import', href: '/lifecycle/bulk-import', capability: 'postEvents' }
+            { id: 'lifecycle', icon: 'refresh', label: 'Lifecycle Events', href: '/lifecycle', capability: 'postEvents' },
+            { id: 'bulk-import', icon: 'upload', label: 'Bulk Import', href: '/lifecycle/bulk-import', capability: 'postEvents' }
         ]
     },
     {

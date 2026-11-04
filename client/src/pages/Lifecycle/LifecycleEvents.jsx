@@ -31,6 +31,7 @@ import { useAssetClasses } from '../../hooks/useAssetClasses';
 import { FIELD_SCHEMAS, FIELD_DEFAULTS, reinstatementFieldsFromAsset } from '../../data/lifecycleFormSchemas';
 import { useFormOptions } from '../../hooks/useFormOptions';
 import { EVENT_FORM_COMPONENTS } from './eventForms';
+import { Icon } from '../../components/ui/Icon';
 import {
     parseCsv,
     downloadCsv,
@@ -389,7 +390,7 @@ function MasterDataSetSection({
                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('many'); } }}>
             <span className="mode-radio" aria-hidden="true"/>
             <div>
-              <h4>Same Transaction → All Assets</h4>
+              <h4>Same Transaction <Icon name="arrowRight" size={14}/> All Assets</h4>
               <p>Build a set of assets, pick one event type, download a CSV pre-filled with all selected assets, fill in the field values, and post it.</p>
             </div>
           </div>
@@ -399,7 +400,7 @@ function MasterDataSetSection({
                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('one'); } }}>
             <span className="mode-radio" aria-hidden="true"/>
             <div>
-              <h4>Multiple Transactions → One Asset</h4>
+              <h4>Multiple Transactions <Icon name="arrowRight" size={14}/> One Asset</h4>
               <p>Pick one asset, download a CSV pre-filled with that asset, set each row’s event type and fields, and post it.</p>
             </div>
           </div>

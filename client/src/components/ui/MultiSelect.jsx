@@ -4,6 +4,7 @@
 // ======================================================
 
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 
 // ======================================================
 // START: Component Functions
@@ -55,7 +56,7 @@ export function MultiSelect({ label, options, selected, onChange, allLabel = 'Al
       <label>{label}</label>
       <button type="button" className="btn btn-ghost" onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
         <span>{summary}</span>
-        <span aria-hidden="true" style={{ marginLeft: 8, flexShrink: 0 }}>{open ? '▴' : '▾'}</span>
+        <span aria-hidden="true" style={{ marginLeft: 8, flexShrink: 0 }}><Icon name={open ? 'chevronUp' : 'chevronDown'} size={14}/></span>
       </button>
       {open && (<div className="card" style={{
             position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,

@@ -9,6 +9,7 @@ import { AppLayout } from '../../layout/AppLayout';
 import { Button } from '../../components/ui/Button';
 import { AssetForm as AssetFormFields } from '../../components/asset/AssetForm';
 import { assetsApi } from '../../api/assets.api';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -40,7 +41,7 @@ export function AssetForm() {
           <p>Capitalize a new asset into the register</p>
         </div>
         <Button variant="ghost" to="/assets">
-          ← Back to Register
+          <Icon name="arrowLeft" size={15}/> Back to Register
         </Button>
       </div>
 

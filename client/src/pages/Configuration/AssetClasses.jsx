@@ -14,6 +14,7 @@ import { Pagination, usePagination } from '../../components/ui/Pagination';
 import { configApi } from '../../api/config.api';
 import { downloadCsv } from '../../utils/csv';
 import { getActiveAssetClassTable, invalidateCustomAssetClasses, setActiveAssetClassTable } from '../../hooks/useAssetClasses';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -108,7 +109,7 @@ function ClassHistoryModal({ target, onClose }) {
           {!original && <div className="text-sm text-muted">Changed by {v.changedBy || 'Unknown'} on {v.changedAt ? new Date(v.changedAt).toLocaleString() : '—'}</div>}
           <div className="text-sm" style={{ marginTop: 4 }}>Rate % {showVal(v.ratePct)} · Bonus % {showVal(v.bonusPct)} · {showVal(v.method)} · {showVal(v.convention)} · {showVal(v.life)}</div>
           {!original && v.changes.length > 0 && <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                {v.changes.map((c) => (<li key={c.field} className="text-sm"><b>{FIELD_LABELS[c.field] ?? c.field}:</b> {showVal(c.from)} → <b>{showVal(c.to)}</b></li>))}
+                {v.changes.map((c) => (<li key={c.field} className="text-sm"><b>{FIELD_LABELS[c.field] ?? c.field}:</b> {showVal(c.from)} <Icon name="arrowRight" size={12}/> <b>{showVal(c.to)}</b></li>))}
               </ul>}
         </div>);
       })}

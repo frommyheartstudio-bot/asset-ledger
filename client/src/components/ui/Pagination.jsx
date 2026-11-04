@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from './Button';
+import { Icon } from './Icon';
 
 // ======================================================
 // START: Component Functions
@@ -41,7 +42,7 @@ export function usePagination(items, initialSize = 10) {
 // ======================================================
 // Function : PagerBar
 // Purpose  : Presentational pager: "Showing 1–10 of 21", rows-per-page select
-//            and a  ‹  Page 1 of 3  ›  stepper. Used by Pagination and by the
+//            and a  < Page 1 of 3 >  stepper. Used by Pagination and by the
 //            Asset Register (which paginates its own list).
 // ======================================================
 export function PagerBar({ total, page, totalPages, pageSize, setPage, setPageSize, sizes = PAGE_SIZES }) {
@@ -53,9 +54,9 @@ export function PagerBar({ total, page, totalPages, pageSize, setPage, setPageSi
         {sizes.map((n) => (<option key={n} value={n}>{n} / page</option>))}
       </select>
       <div className="pager-stepper" role="navigation" aria-label="Pagination">
-        <button type="button" className="pager-btn" onClick={() => setPage(page - 1)} disabled={page <= 1} aria-label="Previous page">‹</button>
+        <button type="button" className="pager-btn" onClick={() => setPage(page - 1)} disabled={page <= 1} aria-label="Previous page"><Icon name="chevronLeft" size={20}/></button>
         <span className="pager-current">Page <b>{page}</b> of {totalPages}</span>
-        <button type="button" className="pager-btn" onClick={() => setPage(page + 1)} disabled={page >= totalPages} aria-label="Next page">›</button>
+        <button type="button" className="pager-btn" onClick={() => setPage(page + 1)} disabled={page >= totalPages} aria-label="Next page"><Icon name="chevronRight" size={20}/></button>
       </div>
     </div>);
 }

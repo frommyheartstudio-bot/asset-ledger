@@ -20,6 +20,7 @@ import { formatDate } from '../../utils/formatDate';
 import { useAuth } from '../../context/AuthContext';
 import { BookSelect } from '../../components/ui/BookSelect';
 import { getDefaultBook, getBookNames } from '../../hooks/useBooks';
+import { Icon } from '../../components/ui/Icon';
 
 // ======================================================
 // START: Page Component
@@ -149,7 +150,7 @@ export function AssetDetail() {
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" to="/assets">
-            ← Back
+            <Icon name="arrowLeft" size={15}/> Back
           </Button>
           {canPostEvents && <PostEventMenu assetNumber={asset.assetNumber} assetStatus={asset.status}/>}
           <Button variant="primary" to="/modeling">
@@ -244,7 +245,7 @@ export function AssetDetail() {
             <div className="card-head">
               <h3>Lifecycle Timeline</h3>
               <Button variant="ghost" size="sm" to="/lifecycle">
-                Manage →
+                Manage <Icon name="arrowRight" size={14}/>
               </Button>
             </div>
             <div className="card-pad">
@@ -299,7 +300,7 @@ export function AssetDetail() {
                     const isOpen = expandedYear === year;
                     return (<Fragment key={row.year}>
                       <tr onClick={() => toggleYear(row)} style={{ cursor: 'pointer' }}>
-                        <td><span style={{ display: 'inline-block', width: 14 }}>{isOpen ? '▾' : '▸'}</span>{row.year}</td>
+                        <td><Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={14} style={{ marginRight: 6 }}/>{row.year}</td>
                         <td className="num" data-label="Opening NBV">{formatCurrency(row.openingNbv, { compact: true })}</td>
                         <td className="num" data-label="Rate">{row.rate.toFixed(2)}%</td>
                         <td className="num" data-label="Bonus">{formatCurrency(row.bonus ?? 0, { compact: true })}</td>

@@ -49,7 +49,7 @@
     font-family: inherit;
 }
 .nav-group .label-toggle:hover { color: #fff; }
-.nav-group .label-toggle .chevron { font-size: 10px; transition: transform 0.15s ease; }
+.nav-group .label-toggle .chevron { display: inline-flex; transition: transform 0.15s ease; }
 .nav-group .label-toggle .chevron.open { transform: rotate(180deg); }
 .nav-item {
   display: flex; align-items: center; gap: 11px;
@@ -59,7 +59,7 @@
 }
 .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; text-decoration: none; }
 .nav-item.active { background: var(--accent); color: #fff; font-weight: 600; }
-.nav-item .ico { width: 18px; text-align: center; font-size: 15px; opacity: 0.9; }
+.nav-item .ico { width: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; opacity: 0.9; }
 
 .sidebar .foot {
   margin-top: auto; padding: 14px 16px;
@@ -91,7 +91,7 @@
 .topbar .search input { border: none; background: transparent; outline: none; font-size: 13px; flex: 1; color: var(--text); min-width: 0; }
 .topbar .search .search-clear {
   border: none; background: transparent; cursor: pointer; color: var(--text-muted);
-  font-size: 13px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+  font-size: 13px; line-height: 1; padding: 0 2px; flex-shrink: 0; display: inline-flex; align-items: center;
 }
 .topbar .search .search-clear:hover { color: var(--text); }
 .topbar .icon-btn {
@@ -134,7 +134,7 @@
 .notif-item:last-child { border-bottom: none; }
 .notif-item-name { font-weight: 700; color: var(--text); }
 .notif-item-when { margin-top: 2px; }
-.notif-close { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border: none; background: transparent; color: var(--text-muted); font-size: 12px; line-height: 1; border-radius: 4px; cursor: pointer; }
+.notif-close { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border: none; background: transparent; color: var(--text-muted); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; border-radius: 4px; cursor: pointer; }
 .notif-close:hover { background: #fee2e2; color: var(--red); }
 
 
@@ -176,7 +176,7 @@
   padding: 6px 2px;
 }
 .bottom-nav-item:hover { text-decoration: none; color: var(--text-muted); }
-.bottom-nav-item .ico { font-size: 18px; line-height: 1; }
+.bottom-nav-item .ico { font-size: 18px; line-height: 1; display: inline-flex; justify-content: center; }
 .bottom-nav-item .txt { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1px; }
 .bottom-nav-item.active { color: var(--accent); }
 

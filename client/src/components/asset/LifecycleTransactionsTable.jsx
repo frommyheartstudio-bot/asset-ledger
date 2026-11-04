@@ -20,6 +20,7 @@ import { Pill } from '../ui/ui';
 import { Pagination, usePagination } from '../ui/Pagination';
 import { EmptyState } from '../common/EmptyState';
 import { formatDateTime } from '../../utils/formatDate';
+import { Icon } from '../ui/Icon';
 
 // ======================================================
 // START: Component Functions
@@ -68,7 +69,7 @@ export function LifecycleTransactionsTable({ items, showAssetColumn = false, emp
                   <td>
                     <Pill tone={tx.preview.badgeTone}>{tx.preview.badgeText}</Pill>
                   </td>
-                  <td className="text-right text-muted">{isOpen ? '▲ Hide' : '▼ View calculation'}</td>
+                  <td className="text-right text-muted"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name={isOpen ? 'chevronUp' : 'chevronDown'} size={14}/>{isOpen ? 'Hide' : 'View calculation'}</span></td>
                 </tr>
 
                 {isOpen && (<tr>

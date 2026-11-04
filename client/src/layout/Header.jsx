@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../api/auth.api';
+import { Icon } from '../components/ui/Icon';
 
 // ======================================================
 // START: Layout Component
@@ -138,7 +139,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
 
     return (<div className="topbar">
       {showMenuToggle && (<button className="icon-btn menu-toggle" title={menuOpen ? 'Close menu' : 'Menu'} aria-label="Toggle navigation" aria-expanded={!!menuOpen} onClick={onMenuClick}>
-        {menuOpen ? '✕' : '☰'}
+        <Icon name={menuOpen ? 'close' : 'menu'} size={18}/>
       </button>)}
       <div className="topbar-titles">
         <div className="page-title">{title}</div>
@@ -146,14 +147,14 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
       </div>
       <div className="spacer"/>
       <div className="search">
-        <span>⌕</span>
+        <span className="search-ico" style={{ display: 'inline-flex', color: 'var(--text-light)' }}><Icon name="search" size={15}/></span>
         <input
           placeholder="Search assets"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSearch()}
         />
-        {query && (<button type="button" className="search-clear" title="Clear search" aria-label="Clear search" onClick={clearSearch}>✕</button>)}
+        {query && (<button type="button" className="search-clear" title="Clear search" aria-label="Clear search" onClick={clearSearch}><Icon name="close" size={13}/></button>)}
       </div>
       <div className={`icon-btn notif-btn ${canSeeLogins ? '' : 'notif-btn-static'}`} title="Notifications" ref={notifRef} onClick={canSeeLogins ? toggleNotifications : undefined} style={{ position: 'relative', cursor: canSeeLogins ? 'pointer' : 'default' }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>{unseenLogins.length > 0 && <span className="badge-dot"/>}
@@ -164,7 +165,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
             </div>
             {logins.length === 0 && <div className="notif-empty">Nothing yet.</div>}
             {logins.map((n) => (<div className="notif-item" key={n.seq} style={n.type === 'registration' ? { cursor: 'pointer' } : undefined} onClick={n.type === 'registration' ? () => { setNotifOpen(false); navigate('/users'); } : undefined}>
-                <button type="button" className="notif-close" title="Delete notification" aria-label="Delete notification" onClick={(e) => removeNotification(e, n.seq)}>✕</button>
+                <button type="button" className="notif-close" title="Delete notification" aria-label="Delete notification" onClick={(e) => removeNotification(e, n.seq)}><Icon name="close" size={13}/></button>
                 {n.type === 'registration' ? (<>
                   <div className="notif-item-name">🆕 New registration — {n.name} <span className="text-muted">({n.email})</span></div>
                   <div className="notif-item-when text-muted">Review in User Management · {timeAgo(n.at)}</div>
@@ -175,9 +176,9 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
               </div>))}
           </div>)}
       </div>
-      <div className="icon-btn" title="Help">
-        ?
-      </div>
+      <button type="button" className="icon-btn" title="Help" aria-label="Help: ask the assistant" onClick={() => window.dispatchEvent(new Event('assetledger:open-assistant'))}>
+        <Icon name="help" size={18}/>
+      </button>
       <div className="account-menu" ref={menuRef}>
         <button type="button" className="avatar" title={user?.name ?? 'Guest'} aria-haspopup="true" aria-expanded={menuIsOpen} onClick={() => setMenuIsOpen((v) => !v)}>
           {user?.initials ?? '?'}
@@ -185,7 +186,7 @@ export function Header({ title, crumb, onMenuClick, menuOpen, showMenuToggle }) 
         {menuIsOpen && (<div className="account-dropdown">
             <div className="account-dropdown-who">{user?.name ?? 'Guest'}</div>
             <button type="button" className="account-dropdown-item" onClick={handleLogout}>
-              ⏻ Log out
+              <Icon name="logout" size={15}/> Log out
             </button>
           </div>)}
       </div>
