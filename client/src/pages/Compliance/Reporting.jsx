@@ -54,7 +54,54 @@ const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 1996; // = 2026 - 30, fixed at build time
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 30 - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i);
 
+// Full-detail report: one line per Asset x Book x Year. Asset / fact-pattern
+// columns repeat on every line of an asset; the schedule columns (Year onward)
+// change per year and carry the year-end Bonus, Revision Absorbed,
+// Depreciation, Accum. Depreciation and NBV.
+const money = (v) => (v === '' || v === null || v === undefined ? '' : Number(v).toFixed(2));
 const CSV_COLUMNS = [
+    { header: 'Book', get: (r) => r.book },
+    { header: 'Book Rule Source', get: (r) => r.ruleSource },
+    { header: 'Book Rule Name', get: (r) => r.ruleName },
+    { header: 'Asset Number', get: (r) => r.assetNumber },
+    { header: 'Description', get: (r) => r.description },
+    { header: 'Asset Class', get: (r) => r.assetClass },
+    { header: 'Company', get: (r) => r.company },
+    { header: 'Cost Center', get: (r) => r.costCenter },
+    { header: 'Location', get: (r) => r.location },
+    { header: 'Project', get: (r) => r.project },
+    { header: 'Status', get: (r) => r.status },
+    { header: 'Placed In Service', get: (r) => r.placedInService },
+    { header: 'Booked Period', get: (r) => r.bookedPeriod },
+    { header: 'Recovery Period', get: (r) => r.recoveryPeriod },
+    { header: 'Method', get: (r) => r.method },
+    { header: 'Convention', get: (r) => r.convention },
+    { header: 'Property Type', get: (r) => r.propertyType },
+    { header: 'Bonus %', get: (r) => r.bonusPct },
+    { header: 'Bonus Amount (AFYD)', get: (r) => money(r.bonusAmount) },
+    { header: 'Annual Rate %', get: (r) => money(r.annualRate) },
+    { header: 'Cost', get: (r) => money(r.cost) },
+    { header: 'Accum. Depreciation (Current)', get: (r) => money(r.accumDepreciation) },
+    { header: 'NBV (Current)', get: (r) => money(r.nbv) },
+    { header: 'Disposal Date', get: (r) => r.disposalDate },
+    { header: 'Accum. Depr at Disposal', get: (r) => money(r.adAtDisposal) },
+    { header: 'Gain / Loss', get: (r) => money(r.gainLoss) },
+    { header: 'Schedule Year', get: (r) => r.year },
+    { header: 'Year-End Date', get: (r) => r.yearEndDate },
+    { header: 'Opening NBV', get: (r) => money(r.openingNbv) },
+    { header: 'Rate %', get: (r) => money(r.rate) },
+    { header: 'Bonus (Year)', get: (r) => money(r.bonus) },
+    { header: 'Revision Absorbed (Current Yr)', get: (r) => money(r.cyRevisionAbsorbed) },
+    { header: 'Revision Absorbed (Prior Yr)', get: (r) => money(r.pyRevisionAbsorbed) },
+    { header: 'Bonus Revision (Prior Yr)', get: (r) => money(r.pyBonusRevisionAbsorbed) },
+    { header: 'Depreciation (Year)', get: (r) => money(r.depreciation) },
+    { header: 'Accum. Depreciation (Year-End)', get: (r) => money(r.yearEndAccumDepreciation) },
+    { header: 'Closing NBV (Year-End)', get: (r) => money(r.closingNbv) }
+];
+
+// Old 10-column layout — only used to rebuild very old "Recently Generated"
+// rows that never stored their own csvContent.
+const LEGACY_COLUMNS = [
     { header: 'Book', get: (a) => a.book ?? getDefaultBook() },
     { header: 'Asset Number', get: (a) => a.assetNumber },
     { header: 'Description', get: (a) => a.description },
@@ -102,10 +149,10 @@ function slugify(name) {
 //            shared by the Custom Report and Scheduled Report cards.
 // ======================================================
 
-function buildCsvText(rows) {
+function buildCsvText(rows, columns = CSV_COLUMNS) {
     const lines = [
-        CSV_COLUMNS.map((c) => csvCell(c.header)).join(','),
-        ...rows.map((a) => CSV_COLUMNS.map((c) => csvCell(c.get(a))).join(','))
+        columns.map((c) => csvCell(c.header)).join(','),
+        ...rows.map((a) => columns.map((c) => csvCell(c.get(a))).join(','))
     ];
     return lines.join('\n') + '\n';
 }
@@ -135,8 +182,11 @@ function filterAssets(allAssets, companies, assetTypes) {
 // ======================================================
 
 async function collectBookRows(books, companies, assetTypes) {
-    const perBook = await Promise.all(books.map((b) => assetsApi.list({ book: b })));
-    return perBook.flatMap((res, i) => filterAssets((res.items ?? []).map((a) => ({ ...a, book: a.book ?? books[i] })), companies, assetTypes));
+    // Built server-side so every asset field, fact-pattern value and the
+    // year-by-year schedule (bonus, revision absorbed, year-end balances)
+    // come from the same calculation Asset Detail shows.
+    const res = await reportsApi.getDetail(books, companies, assetTypes);
+    return res.rows ?? [];
 }
 
 // ======================================================
@@ -460,7 +510,7 @@ export function Reporting() {
     // reconstruction available, since the original company/asset-type
     // filter for those runs was never persisted.
     function handleDownload(row) {
-        const text = row.csvContent && row.csvContent.trim() ? row.csvContent : buildCsvText(allAssets);
+        const text = row.csvContent && row.csvContent.trim() ? row.csvContent : buildCsvText(allAssets, LEGACY_COLUMNS);
         downloadCsv(`${slugify(row.name)}.csv`, text);
     }
 

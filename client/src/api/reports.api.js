@@ -16,6 +16,10 @@ export const reportsApi = {
     // (name/book/period/who) so it shows up in "Recently Generated
     // Reports". The CSV file itself is built and downloaded client-side.
     generateReport: (payload) => api.post('/reporting/generate', payload),
+    // Full-detail rows (asset fields + fact pattern + one line per schedule year
+    // with bonus / revision / year-end balances) for the chosen books, companies
+    // and asset types. Feeds the report CSV.
+    getDetail: (books, companies, assetTypes) => api.post('/reporting/detail', { books, companies, assetTypes }),
     // Planning (Modeling + Forecasting) calls live here too, since the target
     // structure only calls out one extra api file per domain group.
     getModelingScenarios: () => api.get('/modeling/scenarios'),

@@ -8,6 +8,8 @@ import { Router } from 'express';
 import { computeForecast } from '../data/activity.js';
 import { resolveBook } from '../data/books.js';
 import { primeBookRules } from '../services/book-view.js';
+import { assets as allAssetRows } from '../data/assets.js';
+import { buildReportDetailRows } from '../services/report-detail.js';
 import { isKnownBook } from '../data/books.js';
 import { listAssetTypes } from '../services/assetTypeConfig.js';
 import { getFormOptions } from '../services/formOptions.js';
@@ -195,6 +197,34 @@ reportingRouter.post('/generate', async (req, res) => {
   } catch (err) {
     console.error('[reporting] generate failed:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to save the report run' });
+  }
+});
+
+// ======================================================
+// Function : POST /detail
+// Purpose  : Full-detail rows for the Reporting Center CSV: every asset field,
+//            fact-pattern value and calculation, plus one line per schedule
+//            year with Bonus, Revision Absorbed, Depreciation and the
+//            year-end Accum. Depreciation / NBV, for each ticked book.
+// Input    : req.body { books: string[], companies?: string[], assetTypes?: string[] }
+// Output   : res (HTTP response, JSON) { total, rows }
+// ======================================================
+
+reportingRouter.post('/detail', async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const books: string[] = Array.isArray(body.books) ? body.books.map(String).filter((b: string) => isKnownBook(b)) : [];
+    if (books.length === 0) {
+      res.status(400).json({ error: 'Pick at least one valid book' });
+      return;
+    }
+    const list = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+    await primeBookRules();
+    const rows = buildReportDetailRows(allAssetRows, books, list(body.companies), list(body.assetTypes));
+    res.json({ total: rows.length, rows });
+  } catch (err) {
+    console.error('[reporting] detail failed:', err);
+    res.status(500).json({ error: 'Failed to build the report detail' });
   }
 });
 
