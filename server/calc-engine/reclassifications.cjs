@@ -268,59 +268,27 @@ function calculateNewParameters(input, reclassType, timingResult) {
 // ======================================================
 
 function calculateReclassRevision(input, reclassType, timingResult, oldParamsResult, newParamsResult) {
-  // Revision = (Depr under new params - Depr under old params) for backdated periods
-  // Can be positive (shorter life/more accelerated) or negative (longer life)
-  if (timingResult.timing === 'current') {
-    return {
-      revision: 0,
-      pyRevision: 0,
-      totalRevision: 0,
-      direction: 'none',
-      formula: 'No revision (current period reclassification)',
-      formulaValues: '$0.00'
-    };
-  }
-
-  var deprDifference = newParamsResult.totalDeprNew - oldParamsResult.totalDeprOld;
-  var direction = deprDifference > 0 ? 'positive (shorter life/more accelerated)' : deprDifference < 0 ? 'negative (longer life)' : 'zero';
-
-  var revision = deprDifference;
-  var pyRevision = 0;
-
-  if (timingResult.timing === 'backdated-prior-year') {
-    // Split between prior year and current year (M-1)
-    var totalMonths = timingResult.backdatedMonths - 1;
-    if (totalMonths < 0) totalMonths = 0;
-    var monthsInPY = 12 - timingResult.effectiveMonth;
-    var monthsInCY = timingResult.accountingMonth - 1; // M-1
-    if (monthsInCY < 0) monthsInCY = 0;
-    var pyRatio = totalMonths > 0 ? monthsInPY / totalMonths : 0;
-    pyRevision = deprDifference * pyRatio;
-    revision = deprDifference - pyRevision;
-  }
-
+  var t = calculateTaxReclass(input, reclassType);
+  var direction = t.totalRevision > 0.005 ? 'positive (shorter life/more accelerated)' : t.totalRevision < -0.005 ? 'negative (longer life)' : 'zero';
   return {
-    revision: revision,
-    pyRevision: pyRevision,
-    totalRevision: revision + pyRevision,
-    deprUnderOld: oldParamsResult.totalDeprOld,
-    deprUnderNew: newParamsResult.totalDeprNew,
-    deprDifference: deprDifference,
+    revision: t.fedRevision,
+    pyRevision: t.pyRevision,
+    totalRevision: t.totalRevision,
+    bonusChange: t.bonusChange,
+    currentMonthNew: t.currentMonthNew,
+    adMovement: t.adMovement,
+    deprUnderOld: t.bookedRegular,
+    deprUnderNew: t.cumNewPrev,
+    deprDifference: t.totalRevision,
     direction: direction,
-    formula: 'revision = deprUnderNewParams - deprUnderOldParams',
-    formulaValues: '$' + newParamsResult.totalDeprNew.toFixed(2) + ' - $' + oldParamsResult.totalDeprOld.toFixed(2) + ' = $' + deprDifference.toFixed(2) + ' (' + direction + ')',
-    deprOldFormula: 'deprUnderOld = oldBonus + oldRegular',
-    deprOldCalc: '$' + oldParamsResult.bonusDepr.toFixed(2) + ' + $' + oldParamsResult.regularDepr.toFixed(2) + ' = $' + oldParamsResult.totalDeprOld.toFixed(2),
-    deprNewFormula: 'deprUnderNew = newBonus + newRegular',
-    deprNewCalc: '$' + newParamsResult.bonusDepr.toFixed(2) + ' + $' + newParamsResult.regularDepr.toFixed(2) + ' = $' + newParamsResult.totalDeprNew.toFixed(2),
-    diffFormula: 'difference = deprNew - deprOld',
-    diffCalc: '$' + newParamsResult.totalDeprNew.toFixed(2) + ' - $' + oldParamsResult.totalDeprOld.toFixed(2) + ' = $' + deprDifference.toFixed(2),
-    cyFormula: 'fed_revision = difference × CY ratio',
-    cyCalc: '$' + revision.toFixed(2),
-    pyFormula: 'py_revision = difference × PY ratio',
-    pyCalc: '$' + pyRevision.toFixed(2),
+    formula: 'revision = new-facts depreciation from PIS (through prior month) - depreciation already booked',
+    formulaValues: '$' + t.cumNewPrev.toFixed(2) + ' - $' + t.bookedRegular.toFixed(2) + ' = $' + t.totalRevision.toFixed(2) + ' (' + direction + ')',
+    cyFormula: 'fed_revision = total revision - prior-year part',
+    cyCalc: '$' + t.fedRevision.toFixed(2),
+    pyFormula: 'py_revision = new-facts depreciation through Dec 31 prior year - booked',
+    pyCalc: '$' + t.pyRevision.toFixed(2),
     totalFormula: 'total = fed_revision + py_revision',
-    totalCalc: '$' + revision.toFixed(2) + ' + $' + pyRevision.toFixed(2) + ' = $' + (revision + pyRevision).toFixed(2)
+    totalCalc: '$' + t.fedRevision.toFixed(2) + ' + $' + t.pyRevision.toFixed(2) + ' = $' + t.totalRevision.toFixed(2)
   };
 }
 
@@ -344,9 +312,8 @@ function buildReclassDDV(input, reclassType, timingResult, oldParamsResult, newP
   var newMonthlyRate = newParams.lifeMonths > 0 ? newDepreciableBasis / newParams.lifeMonths : 0;
 
   // Updated A/D = existing A/D + revision
-  var updatedAD = input.existingAD + revisionResult.totalRevision;
-  if (updatedAD < 0) updatedAD = 0;
-  if (updatedAD > cost) updatedAD = cost;
+  var updatedAD = input.existingAD + revisionResult.adMovement;
+  if (cost > 0) { if (updatedAD < 0) updatedAD = 0; if (updatedAD > cost) updatedAD = cost; }
 
   var nbv = cost - updatedAD;
 
@@ -359,7 +326,9 @@ function buildReclassDDV(input, reclassType, timingResult, oldParamsResult, newP
     costEndingBalance: cost,
     deprEndingAccum: updatedAD,
     netBookValue: nbv,
-    goingForwardMonthlyDepr: newMonthlyRate,
+    goingForwardMonthlyDepr: revisionResult.currentMonthNew,
+    ytdBonusChange: revisionResult.bonusChange,
+    totalRevisionAbsorbed: revisionResult.totalRevision,
     fedRevisionAbsorbed: revisionResult.revision,
     pyFedRevision: revisionResult.pyRevision,
     revisionDirection: revisionResult.direction,
@@ -394,9 +363,8 @@ function validateReclassPostProcessing(input, reclassType, ddv, revisionResult) 
   });
 
   // Check 2: A/D consistency — existing A/D + revision = ending A/D
-  var expectedAD = input.existingAD + revisionResult.totalRevision;
-  if (expectedAD < 0) expectedAD = 0;
-  if (expectedAD > input.originalCost) expectedAD = input.originalCost;
+  var expectedAD = input.existingAD + revisionResult.adMovement;
+  if (input.originalCost > 0) { if (expectedAD < 0) expectedAD = 0; if (expectedAD > input.originalCost) expectedAD = input.originalCost; }
   var adCheck = Math.abs(ddv.deprEndingAccum - expectedAD) <= TOLERANCE;
   checks.push({
     checkName: 'ad_consistency',
@@ -586,4 +554,39 @@ module.exports = { calculateReclassification: calculateReclassification };
 
 // ======================================================
 // END OF FILE : reclassifications.cjs
-// ======================================================
+// ======================================================// ------------------------------------------------------
+// Tax rule (TRD 5.3.7, Tax-RLR E1/E2): a reclassification recomputes depreciation from the
+// placed-in-service date on the NEW facts (method / life / convention / bonus):
+//   catch-up (revision)  = new-facts regular depreciation through the month BEFORE processing
+//                          - regular depreciation already booked (existing A/D - old bonus)
+//   prior-year part      = new-facts depreciation through Dec 31 of the prior year - booked
+//   bonus change         = new bonus - old bonus (reverses the old bonus when the new class has none)
+//   current month        = new-facts depreciation for the processing month
+//   ending A/D           = existing A/D + bonus change + catch-up + current month
+// ------------------------------------------------------
+function calculateTaxReclass(input, reclassType) {
+  var cost = input.originalCost;
+  var np = reclassType.newParams, op = reclassType.oldParams;
+  var pisY = parseInt(input.pisd.split('-')[0], 10), pisM = parseInt(input.pisd.split('-')[1], 10);
+  var apdY = parseInt(input.accountingPeriodDate.split('-')[0], 10), apdM = parseInt(input.accountingPeriodDate.split('-')[1], 10);
+  var method = np.method === 'ADS' ? 'MACRS ADS' : np.method;
+  function cumThrough(y, m) {
+    if (y < pisY || (y === pisY && m < pisM)) return 0;
+    return RATE_TABLES.getCumulativeDepr({ cost: cost, bonusPercent: np.bonusPercent, lifeYears: np.lifeMonths / 12, method: method,
+      convention: np.convention, pisdMonth: pisM, pisdYear: pisY, targetYear: y, targetMonth: m, quarter: Math.ceil(pisM / 3) });
+  }
+  var prevY = apdM === 1 ? apdY - 1 : apdY, prevM = apdM === 1 ? 12 : apdM - 1;
+  var cumPrev = cumThrough(prevY, prevM);
+  var currentMonthNew = cumThrough(apdY, apdM) - cumPrev;
+  var oldBonus = cost * (op.bonusPercent / 100), newBonus = cost * (np.bonusPercent / 100);
+  var bookedRegular = Math.max(0, (input.existingAD || 0) - oldBonus);
+  var totalRevision = cumPrev - bookedRegular;
+  var pyRevision = pisY < apdY ? cumThrough(apdY - 1, 12) - bookedRegular : 0;
+  var fedRevision = totalRevision - pyRevision;
+  var bonusChange = newBonus - oldBonus;
+  return { totalRevision: totalRevision, pyRevision: pyRevision, fedRevision: fedRevision, bonusChange: bonusChange,
+           currentMonthNew: currentMonthNew, bookedRegular: bookedRegular, cumNewPrev: cumPrev,
+           adMovement: bonusChange + totalRevision + currentMonthNew };
+}
+
+

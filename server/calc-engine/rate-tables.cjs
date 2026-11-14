@@ -199,6 +199,7 @@ var RATE_TABLES = (function() {
       if (tableA1[lifeYears] && year <= tableA1[lifeYears].length) {
         return tableA1[lifeYears][year - 1];
       }
+      if (tableA1[lifeYears]) return 0; // recovery period is over
     }
 
     // MACRS 200% DB with Mid-Quarter
@@ -211,6 +212,7 @@ var RATE_TABLES = (function() {
       if (mqTable[lifeYears] && year <= mqTable[lifeYears].length) {
         return mqTable[lifeYears][year - 1];
       }
+      if (mqTable[lifeYears]) return 0; // recovery period is over
     }
 
     // MACRS 150% DB with Half-Year (State AMT)
@@ -218,6 +220,7 @@ var RATE_TABLES = (function() {
       if (table150DB_HY[lifeYears] && year <= table150DB_HY[lifeYears].length) {
         return table150DB_HY[lifeYears][year - 1];
       }
+      if (table150DB_HY[lifeYears]) return 0; // recovery period is over
     }
 
     // Nonresidential Real Property 39-Year Mid-Month (Table A-7a)
@@ -232,8 +235,17 @@ var RATE_TABLES = (function() {
       return 0;
     }
 
+    // Nonresidential Real 31.5-Year Mid-Month (Pub 946 Table A-7)
+    if (method === 'MACRS Straight-Line' && convention === 'Mid-Month' && lifeYears === 31.5) {
+      var tableA7_year1 = {1:3.042,2:2.778,3:2.513,4:2.249,5:1.984,6:1.720,7:1.455,8:1.190,9:0.926,10:0.661,11:0.397,12:0.132};
+      if (year === 1) return tableA7_year1[monthPIS] || 0;
+      if (year >= 2 && year <= 31) return 3.175;
+      if (year === 32) return Math.max(0, 100 - (tableA7_year1[monthPIS] || 0) - 3.175 * 30);
+      return 0;
+    }
+
     // Residential Rental 27.5-Year Mid-Month (Table A-6)
-    if (method === 'MACRS Straight-Line' && convention === 'Mid-Month' && (lifeYears === 27 || lifeYears === 28)) {
+    if (method === 'MACRS Straight-Line' && convention === 'Mid-Month' && (lifeYears === 27 || lifeYears === 27.5 || lifeYears === 28)) {
       if (year === 1) return tableA6_year1[monthPIS] || 0;
       if (year >= 2 && year <= 27) return tableA6_annual;
       if (year === 28) {

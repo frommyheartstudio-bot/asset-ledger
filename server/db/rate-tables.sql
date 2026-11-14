@@ -459,18 +459,18 @@ INSERT INTO macrs_mm_rate ("tableKey", month, "year1Pct", "annualPct") VALUES
 ('A13a_40yr_MM', 10, 0.521, 2.5),
 ('A13a_40yr_MM', 11, 0.313, 2.5),
 ('A13a_40yr_MM', 12, 0.104, 2.5),
-('ADS_30yr_Residential_MM', 1, 1.597, 3.333),
-('ADS_30yr_Residential_MM', 2, 1.458, 3.333),
-('ADS_30yr_Residential_MM', 3, 1.319, 3.333),
-('ADS_30yr_Residential_MM', 4, 1.181, 3.333),
-('ADS_30yr_Residential_MM', 5, 1.042, 3.333),
-('ADS_30yr_Residential_MM', 6, 0.903, 3.333),
-('ADS_30yr_Residential_MM', 7, 0.764, 3.333),
-('ADS_30yr_Residential_MM', 8, 0.625, 3.333),
-('ADS_30yr_Residential_MM', 9, 0.486, 3.333),
-('ADS_30yr_Residential_MM', 10, 0.347, 3.333),
-('ADS_30yr_Residential_MM', 11, 0.208, 3.333),
-('ADS_30yr_Residential_MM', 12, 0.069, 3.333),
+('ADS_30yr_Residential_MM', 1, 3.194, 3.333),
+('ADS_30yr_Residential_MM', 2, 2.917, 3.333),
+('ADS_30yr_Residential_MM', 3, 2.639, 3.333),
+('ADS_30yr_Residential_MM', 4, 2.361, 3.333),
+('ADS_30yr_Residential_MM', 5, 2.083, 3.333),
+('ADS_30yr_Residential_MM', 6, 1.806, 3.333),
+('ADS_30yr_Residential_MM', 7, 1.528, 3.333),
+('ADS_30yr_Residential_MM', 8, 1.25, 3.333),
+('ADS_30yr_Residential_MM', 9, 0.972, 3.333),
+('ADS_30yr_Residential_MM', 10, 0.694, 3.333),
+('ADS_30yr_Residential_MM', 11, 0.417, 3.333),
+('ADS_30yr_Residential_MM', 12, 0.139, 3.333),
 ('ADS_40yr_Nonresidential_MM', 1, 1.198, 2.5),
 ('ADS_40yr_Nonresidential_MM', 2, 1.094, 2.5),
 ('ADS_40yr_Nonresidential_MM', 3, 0.99, 2.5),
@@ -487,6 +487,13 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO macrs_ads_lives (life) VALUES (3), (5), (9), (10), (12), (20), (25)
 ON CONFLICT DO NOTHING;
+
+-- Correction (ADS 30-yr residential, mid-month): year-1 rates were exactly half of the correct values.
+-- Idempotent: fixes databases that were seeded with the old values (the inserts above never overwrite).
+UPDATE macrs_mm_rate AS t SET "year1Pct" = v.y
+FROM (VALUES (1, 3.194), (2, 2.917), (3, 2.639), (4, 2.361), (5, 2.083), (6, 1.806),
+             (7, 1.528), (8, 1.250), (9, 0.972), (10, 0.694), (11, 0.417), (12, 0.139)) AS v(m, y)
+WHERE t."tableKey" = 'ADS_30yr_Residential_MM' AND t.month = v.m;
 
 -- check: expect 6 tables in by_year (A1,A2..A5,A14 = 6), 60 rows in mm_rate, 7 ads lives
 SELECT (SELECT count(DISTINCT "tableKey") FROM macrs_rate_by_year) AS year_tables, (SELECT count(*) FROM macrs_rate_by_year) AS year_rows, (SELECT count(*) FROM macrs_mm_rate) AS mm_rows, (SELECT count(*) FROM macrs_ads_lives) AS ads_lives;

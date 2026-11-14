@@ -31,22 +31,22 @@ function validateInput(input) {
   var errors = [];
 
   // Req 2.1 — asset cost must be greater than zero
-  if (input.assetCost === undefined || input.assetCost === null || input.assetCost <= 0) {
+  if (input.assetCost === undefined || input.assetCost === null || input.assetCost === 0) {
     errors.push({
       field: 'assetCost',
-      rule: 'assetCost > 0',
-      message: 'Asset cost must be greater than zero'
+      rule: 'assetCost != 0',
+      message: 'Asset cost must not be zero (negative cost = credit asset)'
     });
   }
 
   // Req 2.2 — cost disposed must not exceed asset cost
   if (input.costDisposed !== undefined && input.costDisposed !== null &&
       input.assetCost !== undefined && input.assetCost !== null &&
-      input.costDisposed > input.assetCost) {
+      (Math.abs(input.costDisposed) > Math.abs(input.assetCost) || input.costDisposed * input.assetCost < 0)) {
     errors.push({
       field: 'costDisposed',
       rule: 'costDisposed <= assetCost',
-      message: 'Cost disposed must be less than or equal to total asset cost'
+      message: 'Cost disposed must be less than or equal to total asset cost (same sign)'
     });
   }
 
@@ -250,8 +250,8 @@ function calculateCurrentPeriodDepr(input, disposalValues) {
     if (convention === 'HY') { conventionMultiplier = 0.5; }
     else if (convention === 'MQ') {
       var q; if (disposalMonth <= 3) q = 1; else if (disposalMonth <= 6) q = 2; else if (disposalMonth <= 9) q = 3; else q = 4;
-      conventionMultiplier = {1:10.5/12,2:7.5/12,3:4.5/12,4:1.5/12}[q];
-    } else if (convention === 'MM') { conventionMultiplier = (disposalMonth + 0.5) / 12; }
+      conventionMultiplier = {1:1.5/12,2:4.5/12,3:7.5/12,4:10.5/12}[q];
+    } else if (convention === 'MM') { conventionMultiplier = (disposalMonth - 0.5) / 12; }
     currentYearDepr = fullYearDepr * conventionMultiplier;
   }
 
@@ -287,7 +287,6 @@ function calculateCurrentPeriodDepr(input, disposalValues) {
 // ======================================================
 
 function calculateBackdatedSameYear(input, disposalValues) {
-  // Parse dates from YYYY-MM-DD strings to avoid timezone issues
   var disposalParts = input.disposalDate.split('-');
   var disposalYear = parseInt(disposalParts[0], 10);
   var disposalMonth = parseInt(disposalParts[1], 10); // 1-indexed
@@ -296,43 +295,26 @@ function calculateBackdatedSameYear(input, disposalValues) {
   var accountingYear = parseInt(accountingParts[0], 10);
   var accountingMonth = parseInt(accountingParts[1], 10); // 1-indexed
 
-  // Backdated months = months between disposal date and prior month (M-1).
-  // Per TRD: revision is calculated through the prior month, not current processing month.
   var backdatedMonths = (accountingYear - disposalYear) * 12 + (accountingMonth - 1 - disposalMonth);
   if (backdatedMonths < 0) {
     backdatedMonths = 0;
   }
 
-  // Req 8.1 — Over-recognized depreciation: monthly rate × backdated months
-  var monthlyDeprRate = input.monthlyDeprRate;
-  var overRecognizedDepr = monthlyDeprRate * backdatedMonths;
+  // Tax rule (Tax-RLR C6): the depreciation allowed in the disposal year is the convention
+  // allowance (HY 0.5, MM / MQ by disposal month). Months already booked this year (Jan .. period-1)
+  // are restated to that allowance: revision = allowance - booked (positive = more depreciation).
+  var allowance = calculateCurrentPeriodDepr(input, disposalValues).currentYearDepr;
+  var bookedMonths = Math.max(0, accountingMonth - 1);
+  var bookedDepr = (input.monthlyDeprRate || 0) * bookedMonths * disposalValues.disposalRatio;
+  var revisionAbsorbed = allowance - bookedDepr;
 
-  // Req 8.2 — HY convention adjustment when applicable
-  // When the disposal is backdated within the same year and the convention is HY,
-  // the system would have applied a half-year convention deduction in the disposal year.
-  // Since the asset was actually disposed earlier, this convention amount was over-recognized
-  // and needs to be reversed.
-  var overRecognizedConvention = null;
-  if (input.convention === 'HY') {
-    // The HY convention gives 0.5 × full-year depreciation in the disposal year.
-    // This full half-year amount was recognized but should not have been since the
-    // disposal is backdated. The convention adjustment equals the half-year amount.
-    var fullYearDepr = monthlyDeprRate * 12;
-    overRecognizedConvention = fullYearDepr * 0.5;
-  }
-
-  // Req 8.3 — revisionAbsorbed = negative sum of all over-recognized components
-  var totalOverRecognized = overRecognizedDepr + (overRecognizedConvention !== null ? overRecognizedConvention : 0);
-  var revisionAbsorbed = -totalOverRecognized;
-
-  // Req 8.4 — prior period snapshots are immutable: we do not modify any prior
-  // period values; we only compute the revision adjustment.
-
-  // pyComponent and cyComponent are null for same-year (only used in prior-year Step 7)
   return {
     backdatedMonths: backdatedMonths,
-    overRecognizedDepr: overRecognizedDepr,
-    overRecognizedConvention: overRecognizedConvention,
+    bookedMonths: bookedMonths,
+    bookedDepr: bookedDepr,
+    allowance: allowance,
+    overRecognizedDepr: bookedDepr,
+    overRecognizedConvention: null,
     pyComponent: null,
     cyComponent: null,
     revisionAbsorbed: revisionAbsorbed
@@ -451,6 +433,53 @@ function calculateBackdatedPriorYear(input, disposalValues) {
 // ======================================================
 // END: calculateBackdatedPriorYear
 // ======================================================
+
+// ------------------------------------------------------
+// A/D used for the gain/loss, by timing (one source of truth for the main and multi-basis paths)
+// ------------------------------------------------------
+function adUsedForGainLoss(input, disposalValues, timing, currentYearDepr, backdated) {
+  if (timing === 'current') {
+    return disposalValues.adDisposed + currentYearDepr;
+  }
+  if (timing === 'backdated-same-year') {
+    // Disposal-year allowance (= booked months + revision)
+    return disposalValues.adDisposed + backdated.allowance;
+  }
+  // Backdated prior-year: BOY A/D + CY depr taken (months before processing) + revision
+  var apdMonth = parseInt(input.accountingPeriodDate.split('-')[1], 10);
+  var cyDeprTaken = (input.monthlyDeprRate || 0) * (apdMonth - 1) * disposalValues.disposalRatio;
+  return disposalValues.adDisposed + cyDeprTaken + (backdated ? backdated.revisionAbsorbed : 0);
+}
+
+// ------------------------------------------------------
+// Tax-RLR disposal fields: realized / deferred / recognized and the ordinary vs capital split
+//   Loss                      -> the full loss is ordinary
+//   Gain held <= 1 year       -> the full gain is ordinary
+//   Gain held  > 1 year       -> personal property: min(gain, total depreciation allowed)
+//                                real property (Sec 291): 20% x min(gain, total depreciation allowed)
+//   Credit assets (cost < 0)  -> the full amount is ordinary
+// ------------------------------------------------------
+function calculateGainBreakdown(input, gainLossResult) {
+  var totalDeprAllowed = gainLossResult.adDisposed;
+  var adjustedBasis = gainLossResult.costDisposed - totalDeprAllowed;
+  var realized = gainLossResult.gainLoss;
+  var deferred = input.deferredGainLoss || 0;
+  var recognized = realized - deferred;
+  var oneYear = new Date(input.pisd); oneYear.setFullYear(oneYear.getFullYear() + 1);
+  var heldOverOneYear = new Date(input.disposalDate) > oneYear;
+  var realProperty = input.convention === 'MM';
+  var ordinary;
+  if (input.assetCost < 0) ordinary = recognized;
+  else if (recognized <= 0) ordinary = recognized;
+  else if (!heldOverOneYear) ordinary = recognized;
+  else {
+    var recapture = Math.min(recognized, Math.max(0, totalDeprAllowed));
+    ordinary = realProperty ? 0.2 * recapture : recapture;
+  }
+  return { totalDeprAllowed: totalDeprAllowed, adjustedBasis: adjustedBasis, realizedGainLoss: realized, deferredGainLoss: deferred,
+           recognizedGainLoss: recognized, ordinaryGainLoss: ordinary, capitalGainLoss: recognized - ordinary,
+           heldOverOneYear: heldOverOneYear, realProperty: realProperty };
+}
 
 /**
  * Step 8: Calculate gain or loss on disposal.
@@ -598,24 +627,14 @@ function calculate(input) {
     // ── Step 8: Gain/Loss calculation ────────────────────────────────
     // For current timing, adDisposed must account for current year depreciation.
     // For backdated timing, A/D includes CY depr that was taken + revision (per spreadsheet logic).
-    var adForGainLoss = disposalValues.adDisposed;
-    if (timing === 'current') {
-      adForGainLoss = disposalValues.adDisposed + currentYearDepr;
-    } else {
-      // Backdated: A/D_Disposed = BOY_AD_disposed + CY_depr_taken + revision_absorbed
-      // CY depr taken = monthlyDeprRate × months in CY before processing (through M-1)
-      var apdMonth = parseInt(input.accountingPeriodDate.split('-')[1], 10);
-      var cyDeprTaken = (input.monthlyDeprRate || 0) * (apdMonth - 1);
-      // For full disposal, use full monthly rate; for partial, prorate
-      cyDeprTaken = cyDeprTaken * disposalValues.disposalRatio;
-      adForGainLoss = disposalValues.adDisposed + cyDeprTaken + revisionAbsorbed;
-    }
+    var adForGainLoss = adUsedForGainLoss(input, disposalValues, timing, currentYearDepr, result.steps.step6 || result.steps.step7);
 
     var gainLossResult = calculateGainLoss(
       input.proceeds,
       disposalValues.costDisposed,
       adForGainLoss
     );
+    Object.assign(gainLossResult, calculateGainBreakdown(input, gainLossResult));
     result.steps.step8 = gainLossResult;
     result.activePath.push('step8');
 
@@ -746,23 +765,23 @@ function calculateMultiBasis(input) {
     // Steps 5/6/7: Timing-dependent depreciation / revision
     var currentYearDepr = 0;
     var revisionAbsorbed = 0;
+    var backdatedResult = null;
 
     if (timing === 'current') {
       var deprResult = calculateCurrentPeriodDepr(modifiedInput, disposalValues);
       currentYearDepr = deprResult.currentYearDepr;
     } else if (timing === 'backdated-same-year') {
       var sameYearResult = calculateBackdatedSameYear(modifiedInput, disposalValues);
+      backdatedResult = sameYearResult;
       revisionAbsorbed = sameYearResult.revisionAbsorbed;
     } else if (timing === 'backdated-prior-year') {
       var priorYearResult = calculateBackdatedPriorYear(modifiedInput, disposalValues);
+      backdatedResult = priorYearResult;
       revisionAbsorbed = priorYearResult.revisionAbsorbed;
     }
 
     // Step 8: Gain/Loss calculation
-    var adForGainLoss = disposalValues.adDisposed;
-    if (timing === 'current') {
-      adForGainLoss = disposalValues.adDisposed + currentYearDepr;
-    }
+    var adForGainLoss = adUsedForGainLoss(modifiedInput, disposalValues, timing, currentYearDepr, backdatedResult);
 
     var gainLossResult = calculateGainLoss(
       modifiedInput.proceeds,
@@ -836,7 +855,14 @@ function formatDDV(result) {
     currentYearDepreciation: currentYearDepreciation,
     revisionAbsorbed: revisionAbsorbed,
     gainLoss: gainLoss,
-    proceeds: proceeds
+    proceeds: proceeds,
+    totalDeprAllowed: result.steps.step8.totalDeprAllowed,
+    adjustedBasis: result.steps.step8.adjustedBasis,
+    realizedGainLoss: result.steps.step8.realizedGainLoss,
+    deferredGainLoss: result.steps.step8.deferredGainLoss,
+    recognizedGainLoss: result.steps.step8.recognizedGainLoss,
+    ordinaryGainLoss: result.steps.step8.ordinaryGainLoss,
+    capitalGainLoss: result.steps.step8.capitalGainLoss
   };
 }
 

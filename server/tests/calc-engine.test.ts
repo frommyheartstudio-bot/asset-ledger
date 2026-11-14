@@ -82,9 +82,9 @@ describe('Addition: hand-calculated', () => {
 // ---------------- 2b. Same numbers as the Additions HTML calculator ----------------
 describe('Addition: same behaviour as the HTML calculator', () => {
   const run = (o: any) => require('../calc-engine/additions.cjs').calculateAddition({ ...o, assetConfig });
-  it('A1: HY 5-yr ADS, PIS Feb-26 booked Feb-26 -> fed_reg_depr_exp = year-1 amount / 12 (135.63)', () => {
+  it('A1: HY 5-yr ADS, PIS Feb-26 booked Feb-26 -> fed_reg_depr_exp = year-1 amount / months held (11) = 147.96', () => {
     const r = run({ cost: 16275.56, pisd: '2026-02-16', accountingPeriodDate: '2026-02-28', lifeMonths: 60, bonusPercent: 0, convention: 'HY', quarter: 1, assetType: 'ADS-5' });
-    expect(r.steps.step6b.fedRegDeprExp).toBeCloseTo(135.63, 2);
+    expect(r.steps.step6b.fedRegDeprExp).toBeCloseTo(147.96, 2);
   });
   it('A5: 100% bonus, PIS Oct-25 booked Mar-26 -> one bonus_revision_absorbed = 924', () => {
     const r = run({ cost: 924, pisd: '2025-10-27', accountingPeriodDate: '2026-03-31', lifeMonths: 60, bonusPercent: 100, convention: 'HY', quarter: 4, assetType: 'GDS-5' });

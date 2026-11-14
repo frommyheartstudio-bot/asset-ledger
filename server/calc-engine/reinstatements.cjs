@@ -91,7 +91,7 @@ function determineReinstatementTiming(input) {
       disposalYear: dispYear,
       accountingMonth: apdMonth,
       accountingYear: apdYear,
-      crossYear: false
+      crossYear: (dispYear < apdYear)   // prior-year retirement reinstated now: Tax approval required
     };
   }
 
@@ -169,6 +169,37 @@ function reverseGainLoss(input, timingResult) {
 // ======================================================
 
 // ── Step 5: Calculate Resumed Depreciation ───────────────────
+// ------------------------------------------------------
+// Tax rule (Tax-RLR F2): reinstatement = as if the asset had never been retired.
+// Depreciation resumes from the disposal point on the original facts, using the rate tables.
+//   A/D at disposal (model) : mid-month = to mid disposal month; HY = half of the disposal year
+//   movement                : cumulative through the processing month - A/D at disposal (model)
+// ------------------------------------------------------
+function reinstatementMovement(input, timingResult) {
+  if (typeof RATE_TABLES === 'undefined' || !input.pisd || !input.lifeMonths) return null;
+  var cost = input.originalCost, pisY = parseInt(input.pisd.split('-')[0], 10), pisM = parseInt(input.pisd.split('-')[1], 10);
+  var method = input.method === 'ADS' ? 'MACRS ADS' : (input.method || 'MACRS');
+  var conv = input.convention || 'HY';
+  function cum(y, m) {
+    if (m < 1) { y -= 1; m = 12; }
+    if (y < pisY || (y === pisY && m < pisM)) return 0;
+    return RATE_TABLES.getCumulativeDepr({ cost: cost, bonusPercent: input.bonusPercent || 0, lifeYears: input.lifeMonths / 12, method: method,
+      convention: conv, pisdMonth: pisM, pisdYear: pisY, targetYear: y, targetMonth: m, quarter: Math.ceil(pisM / 3) });
+  }
+  var bonus = cost * ((input.bonusPercent || 0) / 100);
+  var dY = timingResult.disposalYear, dM = timingResult.disposalMonth, aY = timingResult.accountingYear, aM = timingResult.accountingMonth;
+  var atDisposal;
+  if (conv === 'Mid-Month') atDisposal = cum(dY, dM - 1) + 0.5 * (cum(dY, dM) - cum(dY, dM - 1));
+  else {
+    var q = Math.ceil(dM / 3), f = conv === 'MQ' ? {1:1.5/12,2:4.5/12,3:7.5/12,4:10.5/12}[q] : 0.5;
+    atDisposal = cum(dY - 1, 12) + f * (cum(dY, 12) - cum(dY - 1, 12));
+  }
+  var movement = Math.max(0, cum(aY, aM) - atDisposal);
+  var currentMonth = cum(aY, aM) - cum(aY, aM - 1);
+  var pyPortion = dY < aY ? Math.max(0, cum(aY - 1, 12) - atDisposal) : 0;
+  return { movement: movement, currentMonth: currentMonth, pyPortion: pyPortion, bonus: bonus };
+}
+
 // ======================================================
 // Function : calculateResumedDepreciation
 // Purpose  : Performs a calculation for 'calculateResumedDepreciation'
@@ -193,6 +224,8 @@ function calculateResumedDepreciation(input, timingResult, restoredResult) {
 
   // Current period depreciation (going forward)
   var resumedDepr = monthlyRate * (monthsResumed > 0 ? monthsResumed : 1);
+  var model = reinstatementMovement(input, timingResult);
+  if (model) resumedDepr = timingResult.timing === 'current' ? model.movement : model.currentMonth;
 
   // Cap: don't exceed remaining depreciable amount
   var maxDepr = cost - restoredResult.restoredAD;
@@ -202,6 +235,7 @@ function calculateResumedDepreciation(input, timingResult, restoredResult) {
   return {
     monthlyRate: monthlyRate,
     monthsResumed: monthsResumed,
+    model: model,
     resumedDepr: resumedDepr,
     bonusDepr: bonusDepr,
     depreciableBasis: depreciableBasis,
@@ -232,7 +266,8 @@ function calculateReinstatementRevision(input, timingResult, restoredResult, res
       pyRevision: 0,
       totalRevision: 0,
       catchUpMonths: 0,
-      crossYearFlag: false,
+      crossYearFlag: timingResult.crossYear,
+      taxApprovalRequired: timingResult.crossYear,
       formula: 'No revision (current period reinstatement)',
       formulaValues: '$0.00'
     };
@@ -243,6 +278,8 @@ function calculateReinstatementRevision(input, timingResult, restoredResult, res
 
   // Catch-up depreciation for months asset was erroneously disposed
   var catchUpDepr = monthlyRate * monthsDisposed;
+  var rm = resumedDeprResult.model;
+  if (rm) catchUpDepr = rm.movement - rm.currentMonth;
 
   // Cap at remaining depreciable amount
   var maxCatchUp = input.originalCost - restoredResult.restoredAD;
@@ -253,7 +290,12 @@ function calculateReinstatementRevision(input, timingResult, restoredResult, res
   var pyRevision = 0;
   var crossYearFlag = timingResult.crossYear;
 
-  if (timingResult.timing === 'backdated-prior-year') {
+  if (rm && timingResult.crossYear) {
+    pyRevision = Math.min(Math.max(0, rm.pyPortion), catchUpDepr);
+    revision = catchUpDepr - pyRevision;
+  } else if (rm) {
+    revision = catchUpDepr; pyRevision = 0;
+  } else if (timingResult.timing === 'backdated-prior-year') {
     // Split between prior year and current year (M-1)
     var dispMonth = timingResult.disposalMonth;
     var monthsInPY = 12 - dispMonth;

@@ -259,8 +259,14 @@ function calculateRegularDepreciation(input, propertyInfo, bonusResult, timingRe
     var year1Months = 12 - pisdMonth + 0.5;
     currentPeriodDepr = currentYearDepr / year1Months;
   } else {
-    // All other cases: divide annual by 12
-    currentPeriodDepr = currentYearDepr / 12;
+    // Half-year / mid-quarter, first depreciation year: spread the year-1 amount over the months held
+    // (Tax-RLR A1: 1,627.56 / 11 months = 147.96, same as the final step)
+    if ((convention === 'HY' || convention === 'Half-Year' || convention === 'MQ') && deprYearNum === 1) {
+      currentPeriodDepr = currentYearDepr / (12 - pisdMonth + 1);
+    } else {
+      // All other cases: divide annual by 12
+      currentPeriodDepr = currentYearDepr / 12;
+    }
   }
 
   // YTD regular depreciation

@@ -208,6 +208,13 @@ function calculateAdjustmentRegularDepr(input, adjType, bonusResult, timingResul
     monthlyImpact = annualImpact / 12;
   }
   var currentPeriodImpact = monthlyImpact;
+  var apdYearNum = parseInt(input.accountingPeriodDate.split('-')[0], 10);
+  if (effYear < apdYearNum && typeof RATE_TABLES !== 'undefined') {
+    // Prior-year effective date: this period's depreciation uses the CURRENT depreciation-year rate
+    var cyRate0 = RATE_TABLES.lookupRate({ method: method, lifeYears: lifeYears, convention: convention,
+      year: apdYearNum - pisdYear + 1, quarter: Math.ceil(pisdMonth / 3), monthPIS: pisdMonth });
+    currentPeriodImpact = remainingBasis * (cyRate0 / 100) / 12;
+  }
 
   // When adjustment is in same period as a backdated addition,
   // it should cover the same number of months as the addition (from PISD through APD)
@@ -271,12 +278,26 @@ function calculateAdjustmentRevision(input, adjType, bonusResult, regularResult,
   if (timingResult.timing === 'backdated-prior-year') {
     // Split into PY and CY components
     // PY: from effective date through Dec 31 of prior year
-    var monthsInPriorYear = 12 - timingResult.effectiveMonth;
-    var monthsInCurrentYear = timingResult.accountingMonth;
+    // Tax-RLR B1/B2: catch-up runs from the effective month (inclusive; PIS month = half month under
+    // mid-month) to Dec 31 = prior-year; Jan .. (processing month - 1) = same-year, priced at the
+    // CURRENT depreciation-year rate. The processing month itself is booked by the normal run.
+    var pisM = parseInt(input.pisd.split('-')[1], 10), pisY = parseInt(input.pisd.split('-')[0], 10);
+    var effIsPis = (timingResult.effectiveYear === pisY && timingResult.effectiveMonth === pisM);
+    var firstMonthFraction = (effIsPis && (input.convention || 'HY') === 'Mid-Month') ? 0.5 : 1;
+    var monthsInPriorYear = (12 - timingResult.effectiveMonth) + firstMonthFraction;
+    var monthsInCurrentYear = Math.max(0, timingResult.accountingMonth - 1);
+
+    var cyMonthly = regularResult.monthlyImpact;
+    if (typeof RATE_TABLES !== 'undefined' && !bonusResult.isFullBonus) {
+      var cyMethod = input.method || 'MACRS'; if (cyMethod === 'ADS') cyMethod = 'MACRS ADS';
+      var cyRate = RATE_TABLES.lookupRate({ method: cyMethod, lifeYears: input.lifeMonths / 12, convention: input.convention || 'HY',
+        year: timingResult.accountingYear - pisY + 1, quarter: Math.ceil(pisM / 3), monthPIS: pisM });
+      cyMonthly = bonusResult.remainingAdjBasis * (cyRate / 100) / 12;
+    }
 
     pyRevisionAbsorbed = regularResult.monthlyImpact * monthsInPriorYear;
     pyBonusRevisionAbsorbed = bonusRevisionAbsorbed; // bonus is always PY since it's recognized at PISD
-    fedRevisionAbsorbed = regularResult.monthlyImpact * monthsInCurrentYear;
+    fedRevisionAbsorbed = cyMonthly * monthsInCurrentYear;
     bonusRevisionAbsorbed = 0; // bonus goes to PY
   }
 
@@ -286,8 +307,8 @@ function calculateAdjustmentRevision(input, adjType, bonusResult, regularResult,
   var fedDisplayMonths = backdatedMonths;
   var pyDisplayMonths = 0;
   if (timingResult.timing === 'backdated-prior-year') {
-    fedDisplayMonths = timingResult.accountingMonth;
-    pyDisplayMonths = 12 - timingResult.effectiveMonth;
+    fedDisplayMonths = monthsInCurrentYear;
+    pyDisplayMonths = monthsInPriorYear;
   }
 
   return {
@@ -352,7 +373,7 @@ function buildAdjustmentDDV(input, adjType, bonusResult, regularResult, revision
     // Revision is a label for the catch-up portion — don't add it separately
     newAccumDepr = existingAccumDepr + totalDeprImpact;
   } else {
-    newAccumDepr = existingAccumDepr + totalDeprImpact + revisionResult.fedRevisionAbsorbed + revisionResult.bonusRevisionAbsorbed;
+    newAccumDepr = existingAccumDepr + totalDeprImpact + revisionResult.fedRevisionAbsorbed + revisionResult.bonusRevisionAbsorbed + revisionResult.pyRevisionAbsorbed + revisionResult.pyBonusRevisionAbsorbed;
   }
 
   var netBookValue = costEndingBalance - newAccumDepr;
@@ -393,7 +414,7 @@ function buildAdjustmentDDV(input, adjType, bonusResult, regularResult, revision
     pyBonusRevisionAbsorbed: revisionResult.pyBonusRevisionAbsorbed,
     revisionTreatment: timingResult.timing === 'current' ? 'N/A' : 'Immediate',
     // YTD
-    ytdDeprExpense: deprFromRegular + revisionResult.fedRevisionAbsorbed,
+    ytdDeprExpense: deprFromRegular + revisionResult.fedRevisionAbsorbed + revisionResult.pyRevisionAbsorbed,
     totalDeprExpense: newAccumDepr
   };
 }

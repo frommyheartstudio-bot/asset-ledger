@@ -341,10 +341,13 @@ function calculateTransferRevision(input, transferType, adAllocation, sourceImpa
 // ======================================================
 
 function buildTransferDDV(input, transferType, scope, adAllocation, sourceImpact, destImpact, revisionResult, timingResult) {
+  // Tax-RLR D1: a transfer inside one company moves nothing in the company's federal book, so the
+  // transfer in / out fields are zero. Source + destination balances still add up to the company total.
+  var tf = (scope && scope.scope === 'intra-company') ? 0 : 1;
   return {
     source: {
-      costTransferOut: input.costTransferred,
-      adTransferOut: adAllocation.totalADTransferred,
+      costTransferOut: input.costTransferred * tf,
+      adTransferOut: adAllocation.totalADTransferred * tf,
       costEndingBalance: sourceImpact.remainingCost,
       deprEndingAccum: sourceImpact.remainingAD,
       deprInPeriod: sourceImpact.sourceDeprExpense,
@@ -355,8 +358,8 @@ function buildTransferDDV(input, transferType, scope, adAllocation, sourceImpact
       revisionTreatment: timingResult.timing === 'current' ? 'N/A' : 'Immediate'
     },
     destination: {
-      costTransferIn: input.costTransferred,
-      adTransferIn: adAllocation.totalADTransferred,
+      costTransferIn: input.costTransferred * tf,
+      adTransferIn: adAllocation.totalADTransferred * tf,
       costEndingBalance: input.costTransferred,
       deprEndingAccum: adAllocation.totalADTransferred + destImpact.destDeprExpense,
       deprInPeriod: destImpact.destDeprExpense,
